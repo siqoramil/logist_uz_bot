@@ -1,0 +1,169 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: logistic-bot-mongo
+    restart: unless-stopped
+    command:
+      - --auth
+      - --wiredTigerCacheSizeGB=0.5
+      - --bind_ip_all
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "127.0.0.1:9099:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - -u
+        - ${MONGO_ROOT_USER}
+        - -p
+        - ${MONGO_ROOT_PASSWORD}
+        - --authenticationDatabase
+        - admin
+        - --eval
+        - "db.runCommand({ ping: 1 })"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:8-alpine
+    container_name: logistic-bot-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
+      - --io-threads
+      - "2"
+      - --protected-mode
+      - "yes"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    ulimits:
+      nofile:
+        soft: 10032
+        hard: 10032
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  bot:
+    build:
+      context: .
+      cache_from:
+        - node:24-alpine
+    image: logistic-bot:latest
+    container_name: logistic-bot
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+      nproc: 1024
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --enable-source-maps
+      BOT_TOKEN: ${BOT_TOKEN}
+      BROADCAST_INTERVAL_MINUTES: ${BROADCAST_INTERVAL_MINUTES:-60}
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mongo-data:
+  mongo-config:
+  redis-data:
+
+networks:
+  internal:
+    driver: bridge
