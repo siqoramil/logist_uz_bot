@@ -1,39 +1,39 @@
 # Logistic Bot
 
-Ko'p foydalanuvchili Telegram bot — har bir foydalanuvchi o'z xabarini, o'z guruhlarini va o'z intervalini sozlaydi, bot esa belgilangan vaqtda avtomatik tarqatib turadi.
+Многопользовательский Telegram-бот: каждый пользователь настраивает своё сообщение, свои группы и свой интервал, а бот рассылает по этому расписанию автоматически.
 
-> Tillar: **🇺🇿 O'zbekcha** · [🇷🇺 Русский](./README.ru.md) · [🇬🇧 English](./README.en.md)
+> Языки: **🇷🇺 Русский** · [🇺🇿 O'zbekcha](./README.uz.md) · [🇬🇧 English](./README.en.md)
 
-## Qanday ishlaydi
+## Как это работает
 
-1. Foydalanuvchi botga `/start` yozadi.
-2. Botni o'z guruhlariga qo'shadi — guruh avtomatik ro'yxatga tushadi.
-3. Botda xabar matnini va intervalni belgilaydi.
-4. ▶️ **Boshlash** — bot shu foydalanuvchining guruhlariga belgilangan davrda yuborib turadi.
+1. Пользователь пишет боту `/start`.
+2. Добавляет бота в свои группы — каждая группа регистрируется автоматически.
+3. Задаёт текст сообщения и интервал прямо в боте.
+4. ▶️ **Старт** — бот начинает рассылать в группы этого пользователя по расписанию.
 
-> ⚠️ **Muhim:** Telegram Bot API'da "mening guruhlarim" degan metod yo'q. Shuning uchun bot **faqat o'zi qo'shilgan** guruhlarni biladi. Har bir guruhga botni qo'lda qo'shish kerak, va guruhda unga xabar yuborish ruxsati berilgan bo'lishi shart.
+> ⚠️ **Важно:** в Telegram Bot API нет метода «список моих групп». Поэтому бот знает только те группы, **в которые его добавили**. В каждую группу его нужно добавить вручную, и у него должно быть право отправлять сообщения.
 
-## Xususiyatlari
+## Возможности
 
-- 👥 **Ko'p foydalanuvchili** — har kimning xabari, guruhlari va intervali alohida. Botni kim guruhga qo'shgan bo'lsa, o'sha guruh o'shanikiga biriktiriladi.
-- 🎛 **Telegram ichida boshqarish** — inline tugmalar: xabar, interval, guruhlar ro'yxati, hoziroq yuborish, start/stop.
-- ⏱ **Moslashuvchan interval** — 5 daqiqadan 24 soatgacha. Tayyor tugmalar yoki qo'lda son kiritish.
-- 🧹 **Avtomatik tozalash** — bot guruhdan chiqarilsa yoki yozish taqiqlansa, guruh ro'yxatdan o'zi olib tashlanadi.
-- 📊 **Hisobot** — har tarqatishdan keyin nechta yuborildi/xato bo'ldi, qaysi guruhda nima xato — shaxsiy chatga keladi.
-- 🔁 **Ishonchli rejalashtirish** — keyingi vaqt yuborishdan **oldin** yoziladi, shuning uchun nosozlik bir siklni cheksiz takrorlashga olib kelmaydi.
+- 👥 **Многопользовательский режим** — сообщение, группы и интервал у каждого свои. Группа принадлежит тому, кто добавил в неё бота.
+- 🎛 **Управление внутри Telegram** — inline-кнопки: сообщение, интервал, список групп, отправить сейчас, старт/стоп.
+- ⏱ **Гибкий интервал** — от 5 минут до 24 часов: готовые кнопки или ввод числа.
+- 🧹 **Самоочистка списка групп** — если бота исключили или лишили права писать, группа деактивируется автоматически.
+- 📊 **Отчёт по каждой рассылке** — сколько отправлено и сколько ошибок, с причиной по каждой группе, в личный чат.
+- 🔁 **Устойчивое расписание** — время следующего запуска сохраняется **до** отправки, поэтому сбой посреди рассылки не приведёт к бесконечному повтору одного и того же цикла.
 
-## Texnologiyalar
+## Стек технологий
 
-| Komponent | Versiya |
-| --------- | ------- |
+| Компонент | Версия |
+| --------- | ------ |
 | Node.js + TypeScript | 24 / 6.x |
 | [grammY](https://grammy.dev/) | 1.45.x |
 | MongoDB + mongoose | 8 / 9.x |
 | tsx | 4.x |
 
-## Arxitektura
+## Архитектура
 
-Hexagonal (ports & adapters). Bog'liqlik yo'nalishi doim ichkariga qarab:
+Гексагональная (ports & adapters). Зависимости всегда направлены внутрь:
 
 ```
 presentation  →  use-cases  →  ports  ←  infrastructure
@@ -41,53 +41,53 @@ presentation  →  use-cases  →  ports  ←  infrastructure
                   domain
 ```
 
-- **domain** — sof biznes tushunchalari (`Subscriber`, `ManagedChat`, `BroadcastResult`), tashqi kutubxonalarga bog'liq emas.
-- **ports** — interfeyslar (`SubscriberRepository`, `ChatRepository`, `Broadcaster`, `Logger`).
-- **use-cases** — biznes stsenariylari. Faqat portlarga tayanadi.
-- **infrastructure** — portlarning amaliy adapterlari (Mongo, grammY, scheduler).
-- **presentation** — Telegram handlerlari va matnlar.
+- **domain** — чистые бизнес-типы (`Subscriber`, `ManagedChat`, `BroadcastResult`), без внешних библиотек.
+- **ports** — интерфейсы (`SubscriberRepository`, `ChatRepository`, `Broadcaster`, `Logger`).
+- **use-cases** — бизнес-сценарии, зависящие только от портов.
+- **infrastructure** — конкретные адаптеры (Mongo, grammY, планировщик).
+- **presentation** — обработчики Telegram и тексты для пользователя.
 
-Shu sababli Telegram'ni testda soxta `Broadcaster` bilan almashtirish mumkin — `scripts/smoke.ts` aynan shuni qiladi.
+Именно это позволяет в тестах подменить Telegram фейковым `Broadcaster` — см. `scripts/smoke.ts`.
 
-## Loyiha strukturasi
+## Структура проекта
 
 ```
 src/
-├── main.ts                                  # bootstrap: DI, scheduler, bot start
-├── constants.ts                             # throttle, interval chegaralari, tick
+├── main.ts                                  # bootstrap: DI, планировщик, старт бота
+├── constants.ts                             # throttle, границы интервала, тик
 ├── domain/
-│   ├── subscriber.ts                        # foydalanuvchi sozlamalari
-│   ├── managed-chat.ts                      # bot qo'shilgan guruh
-│   ├── broadcast-result.ts                  # yuborish natijasi
+│   ├── subscriber.ts                        # настройки пользователя
+│   ├── managed-chat.ts                      # группа, в которую добавили бота
+│   ├── broadcast-result.ts                  # результат рассылки
 │   ├── errors.ts
-│   └── guard.ts                             # validatsiya
+│   └── guard.ts                             # валидация
 ├── ports/
 │   ├── subscriber-repository.ts
 │   ├── chat-repository.ts
 │   ├── broadcaster.ts
 │   └── logger.ts
 ├── use-cases/
-│   ├── manage-subscriber.ts                 # xabar, interval, start/stop
-│   ├── track-chat.ts                        # guruh qo'shildi/chiqarildi
-│   ├── broadcast-for-subscriber.ts          # bitta foydalanuvchi uchun tarqatish
-│   └── run-due-broadcasts.ts                # vaqti kelganlarni topib yuborish
+│   ├── manage-subscriber.ts                 # сообщение, интервал, старт/стоп
+│   ├── track-chat.ts                        # бота добавили / исключили
+│   ├── broadcast-for-subscriber.ts          # рассылка для одного пользователя
+│   └── run-due-broadcasts.ts                # найти и выполнить всё, чему пришло время
 ├── infrastructure/
-│   ├── env-config.ts                        # .env validatsiyasi
+│   ├── env-config.ts                        # валидация .env
 │   ├── mongo.ts
 │   ├── mongo-subscriber-repository.ts
 │   ├── mongo-chat-repository.ts
-│   ├── grammy-broadcaster.ts                # sendMessage + xato tasnifi
-│   ├── scheduler.ts                         # ustma-ust tushmaydigan tick
+│   ├── grammy-broadcaster.ts                # sendMessage + классификация ошибок
+│   ├── scheduler.ts                         # тик без наложений
 │   └── console-logger.ts
 └── presentation/
-    ├── bot.ts                               # grammY handlerlari, menyu
-    └── texts.ts                             # barcha o'zbekcha matnlar
+    ├── bot.ts                               # обработчики grammY, меню
+    └── texts.ts                             # все тексты (на узбекском)
 
 scripts/
-└── smoke.ts                                 # Mongo'ga qarshi integratsiya testi
+└── smoke.ts                                 # интеграционный тест против реальной Mongo
 ```
 
-## O'rnatish
+## Установка
 
 ```bash
 git clone <repo>
@@ -95,56 +95,56 @@ cd Logistic-Bot
 yarn install
 ```
 
-## Sozlash
+## Конфигурация
 
-### 1. Bot yaratish
+### 1. Создать бота
 
-Telegram'da [@BotFather](https://t.me/BotFather) → `/newbot` → nom va username bering → tokenni oling.
+В Telegram откройте [@BotFather](https://t.me/BotFather) → `/newbot` → задайте имя и username → скопируйте токен.
 
-### 2. `.env` tayyorlash
+### 2. Подготовить `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-| O'zgaruvchi | Majburiy | Tavsif |
-| ----------- | -------- | ------ |
-| `BOT_TOKEN` | ✅ | @BotFather bergan token |
-| `MONGODB_URI` | ✅ | MongoDB ulanish satri |
-| `BROADCAST_INTERVAL_MINUTES` | ❌ | Yangi foydalanuvchilar uchun standart interval (5..1440, standart 60) |
-| `MONGO_ROOT_USER` / `MONGO_ROOT_PASSWORD` / `MONGO_DB` | ✅ (Docker uchun) | Mongo containerini ko'tarish uchun |
-| `REDIS_PASSWORD` / `REDIS_URL` | ❌ | Hozircha kodda ishlatilmaydi |
+| Переменная | Обязательна | Описание |
+| ---------- | ----------- | -------- |
+| `BOT_TOKEN` | ✅ | Токен от @BotFather |
+| `MONGODB_URI` | ✅ | Строка подключения к MongoDB |
+| `BROADCAST_INTERVAL_MINUTES` | ❌ | Интервал по умолчанию для новых пользователей (5..1440, по умолчанию 60) |
+| `MONGO_ROOT_USER` / `MONGO_ROOT_PASSWORD` / `MONGO_DB` | ✅ (для Docker) | Для поднятия контейнера Mongo |
+| `REDIS_PASSWORD` / `REDIS_URL` | ❌ | Пока не используется в коде |
 
-## Ishga tushirish
+## Запуск
 
-### Docker bilan
+### Через Docker
 
 ```bash
-docker compose up -d mongo    # faqat baza
-yarn dev                      # bot host mashinada
+docker compose up -d mongo    # только база
+yarn dev                      # бот на хосте
 ```
 
-Yoki hammasi containerda:
+Или всё в контейнерах:
 
 ```bash
 docker compose up -d
 ```
 
-Bot endi interaktiv emas — TTY kerak emas, `-d` bilan bemalol ishlaydi.
+Бот больше не интерактивный — TTY не нужен, `-d` работает нормально.
 
-### Lokal
+### Локально
 
 ```bash
-yarn dev        # ishlab chiqish (tsx)
-yarn dev:watch  # o'zgarishlarni kuzatib qayta ishga tushirish
+yarn dev        # разработка (tsx)
+yarn dev:watch  # перезапуск при изменениях
 
-yarn build      # production build
+yarn build      # production-сборка
 yarn start
 ```
 
-## Foydalanish
+## Использование
 
-`/start` bosgach shunday panel chiqadi:
+`/start` открывает такую панель:
 
 ```
 📊 Holat
@@ -164,49 +164,51 @@ Yuk bor: Toshkent → Samarqand
 [🔄 Yangilash]
 ```
 
-Buyruqlar: `/start`, `/menu`, `/status`, `/help`.
+Команды: `/start`, `/menu`, `/status`, `/help`.
 
-Xabarni o'zgartirish uchun 📝 bosib yangi matnni yuborasiz. Interval uchun tayyor tugmalar (15/30/60/120/240/480) yoki sonni yozib yuborish.
+Чтобы сменить текст рассылки, нажмите 📝 и отправьте новое сообщение. Для интервала — готовые кнопки (15/30/60/120/240/480) или просто число в минутах.
 
-## Ma'lumotlar modeli
+> Язык интерфейса бота — узбекский. Все строки лежат в `src/presentation/texts.ts`, так что перевод — правка одного файла.
 
-**`subscribers`** — foydalanuvchi sozlamalari:
+## Модель данных
 
-| Maydon | Tavsif |
-| ------ | ------ |
-| `userId` | Telegram user ID (unique) |
-| `message` | Tarqatiladigan matn |
-| `intervalMinutes` | Davr |
-| `active` | Ishlayaptimi |
+**`subscribers`** — настройки пользователя:
+
+| Поле | Описание |
+| ---- | -------- |
+| `userId` | Telegram user ID (уникальный) |
+| `message` | Текст рассылки |
+| `intervalMinutes` | Период |
+| `active` | Включена ли рассылка |
 | `state` | `idle` / `awaiting-message` / `awaiting-interval` |
-| `nextRunAt` | Keyingi yuborish vaqti (indexed) |
-| `lastRunAt` | Oxirgi yuborish |
+| `nextRunAt` | Время следующего запуска (индекс) |
+| `lastRunAt` | Последний запуск |
 
-**`managedchats`** — bot qo'shilgan guruhlar:
+**`managedchats`** — группы, в которые добавили бота:
 
-| Maydon | Tavsif |
-| ------ | ------ |
-| `chatId` | Guruh ID (unique) |
-| `ownerId` | Botni qo'shgan foydalanuvchi |
-| `title` | Guruh nomi |
-| `active` | Bot hali guruhdami |
+| Поле | Описание |
+| ---- | -------- |
+| `chatId` | ID группы (уникальный) |
+| `ownerId` | Пользователь, добавивший бота |
+| `title` | Название группы |
+| `active` | Находится ли бот всё ещё в группе |
 
-## Test
+## Тесты
 
 ```bash
 yarn smoke
 ```
 
-Haqiqiy MongoDB'ga qarshi 30 ta tekshiruv o'tkazadi, Telegram o'rniga soxta `Broadcaster` ishlatiladi: ro'yxatga olish, guruh qo'shish/chiqarish/qayta qo'shish, validatsiya, `findDue` tanlovi, o'lik guruhni tozalash, scheduler qayta rejalashtirishi, stop. Test o'z ma'lumotlarini oxirida tozalaydi.
+Выполняет 30 проверок против реальной MongoDB, подменяя Telegram фейковым `Broadcaster`: регистрация, добавление/удаление/повторное добавление групп, валидация, выборка `findDue`, очистка мёртвых групп, перепланирование в планировщике, остановка. Скрипт сам удаляет свои данные.
 
-## Diqqat qaratish kerak
+## Что важно знать
 
-- **Botni har bir guruhga qo'lda qo'shish kerak.** Bot API guruhlar ro'yxatini bermaydi — bu Telegram cheklovi, kod kamchiligi emas.
-- **Spam chegaralari.** Bir xil matnni ko'p guruhga takror yuborish Telegram tomonidan cheklanishi mumkin. Yuborishlar orasida 1 soniya pauza bor (`BROADCAST_THROTTLE_MS`), lekin guruh ko'p bo'lsa intervalni kattaroq oling.
-- **Guruhdagi ruxsat.** Bot guruhga qo'shilgani yetarli emas — unga xabar yuborish ruxsati berilgan bo'lishi kerak. Aks holda ro'yxatda ko'rinadi, lekin yuborishda xato beradi va hisobotda ko'rsatiladi.
-- **Bir guruh — bir egasi.** Botni guruhga kim oxirgi qo'shgan bo'lsa, guruh o'shanga biriktiriladi.
-- **Scheduler aniqligi.** Tekshiruv har 15 soniyada bo'ladi, shuning uchun yuborish belgilangan vaqtdan 15 soniyagacha kechikishi mumkin.
+- **Бота нужно вручную добавить в каждую группу.** Bot API не отдаёт список групп — это ограничение Telegram, а не недоработка кода.
+- **Ограничения на спам.** Повторная отправка одного текста во множество групп может привести к rate-limit. Между отправками есть пауза в 1 секунду (`BROADCAST_THROTTLE_MS`); при большом числе групп берите интервал побольше.
+- **Права внутри группы.** Одного членства мало — боту нужно право писать. Иначе группа будет в списке, но отправка провалится и попадёт в отчёт.
+- **Одна группа — один владелец.** Группа закрепляется за тем, кто добавил бота последним.
+- **Точность планировщика.** Проверка идёт раз в 15 секунд, поэтому запуск может опоздать до 15 секунд.
 
-## Litsenziya
+## Лицензия
 
 ISC
