@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
-import type { ManagedChat } from "../domain/managed-chat";
-import type { ChatRepository } from "../ports/chat-repository";
+import type { ManagedChat } from "@domain";
+import type { ChatRepository } from "@ports";
 
 const ChatSchema = new Schema<ManagedChat>(
   {

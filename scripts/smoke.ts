@@ -4,15 +4,20 @@
  */
 import "dotenv/config";
 import mongoose from "mongoose";
-import { ConsoleLogger } from "../src/infrastructure/console-logger";
-import { connectMongo, disconnectMongo } from "../src/infrastructure/mongo";
-import { MongoChatRepository } from "../src/infrastructure/mongo-chat-repository";
-import { MongoSubscriberRepository } from "../src/infrastructure/mongo-subscriber-repository";
-import type { Broadcaster, SendOutcome } from "../src/ports/broadcaster";
-import { BroadcastForSubscriberUseCase } from "../src/use-cases/broadcast-for-subscriber";
-import { ManageSubscriberUseCase } from "../src/use-cases/manage-subscriber";
-import { RunDueBroadcastsUseCase } from "../src/use-cases/run-due-broadcasts";
-import { TrackChatUseCase } from "../src/use-cases/track-chat";
+import {
+  ConsoleLogger,
+  MongoChatRepository,
+  MongoSubscriberRepository,
+  connectMongo,
+  disconnectMongo,
+} from "@infrastructure";
+import type { Broadcaster, SendOutcome } from "@ports";
+import {
+  BroadcastForSubscriberUseCase,
+  ManageSubscriberUseCase,
+  RunDueBroadcastsUseCase,
+  TrackChatUseCase,
+} from "@use-cases";
 
 const USER = 999_000_001;
 const KICKED_CHAT = -100_900_000_003;

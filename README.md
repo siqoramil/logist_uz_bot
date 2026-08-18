@@ -2,8 +2,6 @@
 
 Многопользовательский Telegram-бот: каждый пользователь настраивает своё сообщение, свои группы и свой интервал, а бот рассылает по этому расписанию автоматически.
 
-> Языки: **🇷🇺 Русский** · [🇺🇿 O'zbekcha](./README.uz.md) · [🇬🇧 English](./README.en.md)
-
 ## Как это работает
 
 1. Пользователь пишет боту `/start`.
@@ -53,25 +51,29 @@ presentation  →  use-cases  →  ports  ←  infrastructure
 
 ```
 src/
-├── main.ts                                  # bootstrap: DI, планировщик, старт бота
+├── index.ts                                 # bootstrap: DI, планировщик, старт бота
 ├── constants.ts                             # throttle, границы интервала, тик
 ├── domain/
+│   ├── index.ts                             # баррель → @domain
 │   ├── subscriber.ts                        # настройки пользователя
 │   ├── managed-chat.ts                      # группа, в которую добавили бота
 │   ├── broadcast-result.ts                  # результат рассылки
 │   ├── errors.ts
 │   └── guard.ts                             # валидация
 ├── ports/
+│   ├── index.ts                             # баррель → @ports
 │   ├── subscriber-repository.ts
 │   ├── chat-repository.ts
 │   ├── broadcaster.ts
 │   └── logger.ts
 ├── use-cases/
+│   ├── index.ts                             # баррель → @use-cases
 │   ├── manage-subscriber.ts                 # сообщение, интервал, старт/стоп
 │   ├── track-chat.ts                        # бота добавили / исключили
 │   ├── broadcast-for-subscriber.ts          # рассылка для одного пользователя
 │   └── run-due-broadcasts.ts                # найти и выполнить всё, чему пришло время
 ├── infrastructure/
+│   ├── index.ts                             # баррель → @infrastructure
 │   ├── env-config.ts                        # валидация .env
 │   ├── mongo.ts
 │   ├── mongo-subscriber-repository.ts
@@ -80,12 +82,33 @@ src/
 │   ├── scheduler.ts                         # тик без наложений
 │   └── console-logger.ts
 └── presentation/
+    ├── index.ts                             # баррель → @presentation
     ├── bot.ts                               # обработчики grammY, меню
     └── texts.ts                             # все тексты (на узбекском)
 
 scripts/
 └── smoke.ts                                 # интеграционный тест против реальной Mongo
 ```
+
+### Импорты и алиасы
+
+В каждой папке есть `index.ts` — единственная публичная точка входа в слой. Импорт между слоями идёт только через алиас, внутри слоя — обычным относительным путём (`./texts`), чтобы не создавать цикл «файл → свой же баррель».
+
+| Алиас | Указывает на |
+| ----- | ------------ |
+| `@constants` | `src/constants.ts` |
+| `@domain` | `src/domain/index.ts` |
+| `@ports` | `src/ports/index.ts` |
+| `@use-cases` | `src/use-cases/index.ts` |
+| `@infrastructure` | `src/infrastructure/index.ts` |
+| `@presentation` | `src/presentation/index.ts` |
+
+```ts
+import { Guard, type Subscriber } from "@domain";
+import type { SubscriberRepository } from "@ports";
+```
+
+Алиасы объявлены в `paths` внутри `tsconfig.json`. В разработке их разрешает `tsx`, а при сборке `tsc-alias` переписывает их в относительные пути — поэтому `node dist/index.js` работает без загрузчиков и без правки `package.json`.
 
 ## Установка
 

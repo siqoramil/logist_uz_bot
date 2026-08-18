@@ -1,4 +1,4 @@
-import type { Subscriber, SubscriberState } from "../domain/subscriber";
+import type { Subscriber, SubscriberState } from "@domain";
 
 export interface SubscriberPatch {
   readonly username?: string | null;

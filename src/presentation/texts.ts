@@ -1,10 +1,8 @@
 import {
   MAX_BROADCAST_INTERVAL_MINUTES,
   MIN_BROADCAST_INTERVAL_MINUTES,
-} from "../constants";
-import type { BroadcastResult } from "../domain/broadcast-result";
-import type { ManagedChat } from "../domain/managed-chat";
-import type { Subscriber } from "../domain/subscriber";
+} from "@constants";
+import type { BroadcastResult, ManagedChat, Subscriber } from "@domain";
 
 export const escapeHtml = (text: string): string =>
   text

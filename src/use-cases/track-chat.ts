@@ -1,5 +1,4 @@
-import type { ChatRepository } from "../ports/chat-repository";
-import type { Logger } from "../ports/logger";
+import type { ChatRepository, Logger } from "@ports";
 
 export class TrackChatUseCase {
   constructor(

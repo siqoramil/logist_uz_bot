@@ -1,8 +1,10 @@
-import { MS_PER_MINUTE } from "../constants";
-import type { BroadcastResult } from "../domain/broadcast-result";
-import { canBroadcast, type Subscriber } from "../domain/subscriber";
-import type { Logger } from "../ports/logger";
-import type { SubscriberRepository } from "../ports/subscriber-repository";
+import { MS_PER_MINUTE } from "@constants";
+import {
+  canBroadcast,
+  type BroadcastResult,
+  type Subscriber,
+} from "@domain";
+import type { Logger, SubscriberRepository } from "@ports";
 import type { BroadcastForSubscriberUseCase } from "./broadcast-for-subscriber";
 
 /** Called after each subscriber's run so the bot can report back in Telegram. */

@@ -1,15 +1,13 @@
-import { BROADCAST_THROTTLE_MS } from "../constants";
+import { BROADCAST_THROTTLE_MS } from "@constants";
 import {
   emptyBroadcastResult,
   withFailure,
   withSuccess,
+  NoMessageError,
   type BroadcastResult,
-} from "../domain/broadcast-result";
-import { NoMessageError } from "../domain/errors";
-import type { Subscriber } from "../domain/subscriber";
-import type { Broadcaster } from "../ports/broadcaster";
-import type { ChatRepository } from "../ports/chat-repository";
-import type { Logger } from "../ports/logger";
+  type Subscriber,
+} from "@domain";
+import type { Broadcaster, ChatRepository, Logger } from "@ports";
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));

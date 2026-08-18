@@ -1,5 +1,5 @@
 import { GrammyError, type Bot } from "grammy";
-import type { Broadcaster, SendOutcome } from "../ports/broadcaster";
+import type { Broadcaster, SendOutcome } from "@ports";
 
 /** Telegram error codes that mean "never retry this chat". */
 const PERMANENT_DESCRIPTIONS = [

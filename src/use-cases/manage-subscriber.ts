@@ -3,10 +3,9 @@ import {
   MAX_MESSAGE_LENGTH,
   MIN_BROADCAST_INTERVAL_MINUTES,
   MS_PER_MINUTE,
-} from "../constants";
-import { Guard } from "../domain/guard";
-import type { Subscriber, SubscriberState } from "../domain/subscriber";
-import type { SubscriberRepository } from "../ports/subscriber-repository";
+} from "@constants";
+import { Guard, type Subscriber, type SubscriberState } from "@domain";
+import type { SubscriberRepository } from "@ports";
 
 export class ManageSubscriberUseCase {
   constructor(private readonly subscribers: SubscriberRepository) {}

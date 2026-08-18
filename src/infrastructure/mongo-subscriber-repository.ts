@@ -1,11 +1,7 @@
 import { Schema, model } from "mongoose";
-import { DEFAULT_BROADCAST_INTERVAL_MINUTES } from "../constants";
-import { SubscriberNotFoundError } from "../domain/errors";
-import type { Subscriber } from "../domain/subscriber";
-import type {
-  SubscriberPatch,
-  SubscriberRepository,
-} from "../ports/subscriber-repository";
+import { DEFAULT_BROADCAST_INTERVAL_MINUTES } from "@constants";
+import { SubscriberNotFoundError, type Subscriber } from "@domain";
+import type { SubscriberPatch, SubscriberRepository } from "@ports";
 
 interface SubscriberDoc {
   userId: number;

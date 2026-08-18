@@ -1,4 +1,4 @@
-import type { Logger } from "../ports/logger";
+import type { Logger } from "@ports";
 
 export class ConsoleLogger implements Logger {
   info(message: string): void {

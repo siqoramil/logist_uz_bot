@@ -1,12 +1,11 @@
 import { Bot, InlineKeyboard, type Context } from "grammy";
-import { GuardError } from "../domain/guard";
-import type { Subscriber } from "../domain/subscriber";
-import type { ChatRepository } from "../ports/chat-repository";
-import type { Logger } from "../ports/logger";
-import type { SubscriberRepository } from "../ports/subscriber-repository";
-import type { BroadcastForSubscriberUseCase } from "../use-cases/broadcast-for-subscriber";
-import type { ManageSubscriberUseCase } from "../use-cases/manage-subscriber";
-import type { TrackChatUseCase } from "../use-cases/track-chat";
+import { GuardError, type Subscriber } from "@domain";
+import type { ChatRepository, Logger, SubscriberRepository } from "@ports";
+import type {
+  BroadcastForSubscriberUseCase,
+  ManageSubscriberUseCase,
+  TrackChatUseCase,
+} from "@use-cases";
 import * as texts from "./texts";
 
 const INTERVAL_CHOICES = [15, 30, 60, 120, 240, 480] as const;

@@ -1,5 +1,5 @@
-import { SCHEDULER_TICK_MS } from "../constants";
-import type { Logger } from "../ports/logger";
+import { SCHEDULER_TICK_MS } from "@constants";
+import type { Logger } from "@ports";
 
 /**
  * Polls for due broadcasts on a fixed tick. Ticks never overlap: a slow run

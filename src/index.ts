@@ -1,18 +1,22 @@
 import { Bot, GrammyError } from "grammy";
-import { DomainError } from "./domain/errors";
-import { ConsoleLogger } from "./infrastructure/console-logger";
-import { loadConfig } from "./infrastructure/env-config";
-import { GrammyBroadcaster } from "./infrastructure/grammy-broadcaster";
-import { connectMongo, disconnectMongo } from "./infrastructure/mongo";
-import { MongoChatRepository } from "./infrastructure/mongo-chat-repository";
-import { MongoSubscriberRepository } from "./infrastructure/mongo-subscriber-repository";
-import { startScheduler } from "./infrastructure/scheduler";
-import { registerHandlers } from "./presentation/bot";
-import { broadcastReport } from "./presentation/texts";
-import { BroadcastForSubscriberUseCase } from "./use-cases/broadcast-for-subscriber";
-import { ManageSubscriberUseCase } from "./use-cases/manage-subscriber";
-import { RunDueBroadcastsUseCase } from "./use-cases/run-due-broadcasts";
-import { TrackChatUseCase } from "./use-cases/track-chat";
+import { DomainError } from "@domain";
+import {
+  ConsoleLogger,
+  GrammyBroadcaster,
+  MongoChatRepository,
+  MongoSubscriberRepository,
+  connectMongo,
+  disconnectMongo,
+  loadConfig,
+  startScheduler,
+} from "@infrastructure";
+import { broadcastReport, registerHandlers } from "@presentation";
+import {
+  BroadcastForSubscriberUseCase,
+  ManageSubscriberUseCase,
+  RunDueBroadcastsUseCase,
+  TrackChatUseCase,
+} from "@use-cases";
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig();

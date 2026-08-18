@@ -1,4 +1,4 @@
-import type { ManagedChat } from "../domain/managed-chat";
+import type { ManagedChat } from "@domain";
 
 export interface ChatRepository {
   /** Records the group, or reactivates it if the bot was re-added. */

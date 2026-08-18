@@ -3,9 +3,8 @@ import {
   DEFAULT_BROADCAST_INTERVAL_MINUTES,
   MAX_BROADCAST_INTERVAL_MINUTES,
   MIN_BROADCAST_INTERVAL_MINUTES,
-} from "../constants";
-import { ConfigurationError } from "../domain/errors";
-import { isNonEmptyString } from "../domain/guard";
+} from "@constants";
+import { ConfigurationError, isNonEmptyString } from "@domain";
 
 export interface AppConfig {
   readonly botToken: string;
