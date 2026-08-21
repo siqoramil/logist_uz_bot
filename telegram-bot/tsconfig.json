@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@constants": ["./src/constants.ts"],
+      "@domain": ["./src/domain/index.ts"],
+      "@ports": ["./src/ports/index.ts"],
+      "@use-cases": ["./src/use-cases/index.ts"],
+      "@infrastructure": ["./src/infrastructure/index.ts"],
+      "@presentation": ["./src/presentation/index.ts"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
