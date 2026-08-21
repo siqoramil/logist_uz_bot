@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #101d1a;
+  --color-ink-700: #40514c;
+  --color-ink-500: #70807b;
+  --color-canvas: #f4f7f5;
+  --color-brand-600: #0c7c5b;
+  --color-brand-500: #119b72;
+  --color-brand-100: #dff3eb;
+  --color-warm-500: #ee8d47;
+  --font-sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: #101d1a;
+  background: #f4f7f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-enter { animation: enter-up 420ms ease-out both; }
+.grid-texture {
+  background-image:
+    linear-gradient(rgba(16, 29, 26, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 29, 26, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
