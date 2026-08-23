@@ -1,6 +1,10 @@
+import type { DeliveryErrorCode } from "./delivery-error";
+
 export interface BroadcastFailure {
   readonly group: string;
+  readonly code: DeliveryErrorCode;
   readonly reason: string;
+  readonly action: string;
 }
 
 export interface BroadcastResult {

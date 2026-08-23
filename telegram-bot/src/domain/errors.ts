@@ -24,3 +24,18 @@ export class NoMessageError extends DomainError {
     super("Xabar matni hali belgilanmagan");
   }
 }
+
+export type AccessInputErrorCode =
+  | "invalid-username"
+  | "invalid-phone"
+  | "username-in-use"
+  | "phone-in-use";
+
+export class AccessInputError extends DomainError {
+  constructor(
+    readonly code: AccessInputErrorCode,
+    message: string,
+  ) {
+    super(message);
+  }
+}

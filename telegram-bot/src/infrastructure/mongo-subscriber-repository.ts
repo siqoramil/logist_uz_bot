@@ -1,11 +1,16 @@
 import { Schema, model } from "mongoose";
 import { DEFAULT_BROADCAST_INTERVAL_MINUTES } from "@constants";
-import { SubscriberNotFoundError, type Subscriber } from "@domain";
+import {
+  SubscriberNotFoundError,
+  type BotLanguage,
+  type Subscriber,
+} from "@domain";
 import type { SubscriberPatch, SubscriberRepository } from "@ports";
 
 interface SubscriberDoc {
   userId: number;
   username: string | null;
+  language: BotLanguage;
   message: string | null;
   intervalMinutes: number;
   active: boolean;
@@ -18,6 +23,7 @@ const SubscriberSchema = new Schema<SubscriberDoc>(
   {
     userId: { type: Number, required: true, unique: true, index: true },
     username: { type: String, default: null },
+    language: { type: String, enum: ["uz", "ru", "en"], default: "uz" },
     message: { type: String, default: null },
     intervalMinutes: { type: Number, default: DEFAULT_BROADCAST_INTERVAL_MINUTES },
     active: { type: Boolean, default: false },
@@ -33,6 +39,7 @@ const SubscriberModel = model<SubscriberDoc>("Subscriber", SubscriberSchema);
 const toDomain = (doc: SubscriberDoc): Subscriber => ({
   userId: doc.userId,
   username: doc.username ?? null,
+  language: doc.language ?? "uz",
   message: doc.message ?? null,
   intervalMinutes: doc.intervalMinutes,
   active: doc.active,
@@ -47,10 +54,14 @@ export class MongoSubscriberRepository implements SubscriberRepository {
     return doc ? toDomain(doc) : null;
   }
 
-  async ensure(userId: number, username: string | null): Promise<Subscriber> {
+  async ensure(
+    userId: number,
+    username: string | null,
+    preferredLanguage: BotLanguage,
+  ): Promise<Subscriber> {
     const doc = await SubscriberModel.findOneAndUpdate(
       { userId },
-      { $set: { username }, $setOnInsert: { userId } },
+      { $set: { username }, $setOnInsert: { userId, language: preferredLanguage } },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
     )
       .lean<SubscriberDoc>()

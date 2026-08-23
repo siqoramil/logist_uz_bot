@@ -2,43 +2,21 @@ import {
   MAX_BROADCAST_INTERVAL_MINUTES,
   MIN_BROADCAST_INTERVAL_MINUTES,
 } from "@constants";
-import type { BroadcastResult, ManagedChat, Subscriber } from "@domain";
+import type {
+  BotLanguage,
+  BroadcastResult,
+  ManagedChat,
+  Subscriber,
+} from "@domain";
+import { deliveryErrorText } from "./delivery-error-texts";
 
 export const escapeHtml = (text: string): string =>
-  text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const preview = (text: string, max = 120): string => {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
 };
-
-const clock = (date: Date | null): string =>
-  date === null
-    ? "—"
-    : date.toLocaleString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        timeZone: "Asia/Tashkent",
-      });
-
-export const WELCOME = [
-  "👋 <b>Assalomu alaykum!</b>",
-  "",
-  "Bu bot siz tanlagan guruhlarga xabaringizni belgilangan vaqt oralig'ida avtomatik yuborib turadi.",
-  "",
-  "<b>Qanday ishlaydi:</b>",
-  "1️⃣ Botni kerakli guruhga qo'shing va <b>xabar yuborish</b> huquqini bering",
-  "2️⃣ 📝 tugmasi orqali xabar matnini yozing",
-  "3️⃣ ⏱ orqali necha daqiqada bir yuborilishini tanlang",
-  "4️⃣ ▶️ <b>Boshlash</b> tugmasini bosing",
-  "",
-  "⚠️ Bot faqat <b>o'zi qo'shilgan</b> guruhlarga yoza oladi.",
-].join("\n");
 
 export interface PaymentDetails {
   readonly card: string;
@@ -46,132 +24,364 @@ export interface PaymentDetails {
   readonly adminContact: string;
 }
 
-export const accessDenied = (payment: PaymentDetails): string => {
-  const holder = payment.cardHolder
-    ? `\nKarta egasi: <b>${escapeHtml(payment.cardHolder)}</b>`
-    : "";
-  return [
-    "🔒 <b>Botdan foydalanish uchun ruxsat kerak</b>",
-    "",
-    "To'lovni quyidagi kartaga yuboring:",
-    `<code>${escapeHtml(payment.card)}</code>${holder}`,
-    "",
-    `To'lovdan keyin chekni ${escapeHtml(payment.adminContact)} ga yuboring. Admin telefon raqamingiz va Telegram username'ingizni birga tizimga qo'shadi.`,
-    "",
-    "Agar admin telefon raqamingizni qo'shgan bo'lsa, pastdagi tugma orqali o'z kontaktingizni yuboring.",
-  ].join("\n");
-};
+export interface BotCommands {
+  readonly start: string;
+  readonly menu: string;
+  readonly status: string;
+  readonly help: string;
+  readonly language: string;
+}
 
-export const CONTACT_NOT_YOURS =
-  "⚠️ Faqat o'zingizning Telegram kontaktingizni yuboring.";
-export const USERNAME_REQUIRED =
-  "⚠️ Telegram akkauntingizga username o'rnating va /start ni qayta bosing.";
-export const ACCESS_DETAILS_MISMATCH =
-  "⛔️ Kontakt telefon raqami va Telegram username admin kiritgan ma'lumotlarga birga mos kelmadi. Admin bilan bog'laning.";
-export const ACCESS_GRANTED = "✅ Ruxsat tasdiqlandi. Botdan foydalanishingiz mumkin.";
-export const ACCESS_REVOKED = "⛔️ Sizning botdan foydalanish ruxsatingiz faol emas.";
+export interface BotTexts {
+  readonly locale: string;
+  readonly buttons: {
+    readonly message: string;
+    readonly interval: string;
+    readonly groups: string;
+    readonly sendNow: string;
+    readonly start: string;
+    readonly stop: string;
+    readonly refresh: string;
+    readonly back: string;
+    readonly language: string;
+    readonly contact: string;
+  };
+  readonly commands: BotCommands;
+  readonly welcome: string;
+  readonly help: string;
+  readonly languageTitle: string;
+  readonly languageChanged: string;
+  readonly contactNotYours: string;
+  readonly usernameRequired: string;
+  readonly accessDetailsMismatch: string;
+  readonly accessGranted: string;
+  readonly accessRevoked: string;
+  readonly noGroups: string;
+  readonly noMessage: string;
+  readonly started: string;
+  readonly stopped: string;
+  readonly messageSaved: string;
+  readonly invalidMessage: string;
+  readonly invalidInterval: string;
+  readonly sending: string;
+  readonly serverError: string;
+  readonly minuteShort: string;
+  accessDenied(payment: PaymentDetails): string;
+  statusCard(subscriber: Subscriber, chatCount: number): string;
+  groupList(chats: readonly ManagedChat[]): string;
+  askMessage(current: string | null): string;
+  askInterval(current: number): string;
+  intervalSaved(minutes: number): string;
+  groupAdded(title: string): string;
+  groupRemoved(title: string): string;
+  broadcastReport(result: BroadcastResult): string;
+}
 
-export const HELP = [
-  "<b>Buyruqlar</b>",
-  "",
-  "/start — bosh menyu",
-  "/menu — bosh menyu",
-  "/status — hozirgi sozlamalar",
-  "/help — shu yordam",
-  "",
-  `Interval ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES} daqiqa oralig'ida bo'lishi kerak.`,
-].join("\n");
+const clock = (date: Date | null, locale: string): string =>
+  date === null
+    ? "—"
+    : date.toLocaleString(locale, {
+        hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit",
+        timeZone: "Asia/Tashkent",
+      });
 
-export const statusCard = (subscriber: Subscriber, chatCount: number): string => {
-  const state = subscriber.active ? "🟢 Ishlayapti" : "⚪️ To'xtatilgan";
-  const message =
-    subscriber.message === null
-      ? "<i>hali belgilanmagan</i>"
-      : escapeHtml(preview(subscriber.message));
-
-  return [
-    "<b>📊 Holat</b>",
-    "",
-    `Rejim:    ${state}`,
-    `Guruhlar: <b>${chatCount}</b> ta`,
-    `Interval: har <b>${subscriber.intervalMinutes}</b> daqiqada`,
-    `Keyingi:  ${clock(subscriber.nextRunAt)}`,
-    `Oxirgi:   ${clock(subscriber.lastRunAt)}`,
-    "",
-    "<b>📝 Xabar:</b>",
-    message,
-  ].join("\n");
-};
-
-export const groupList = (chats: readonly ManagedChat[]): string => {
-  if (chats.length === 0) {
-    return [
-      "📋 <b>Guruhlar yo'q</b>",
-      "",
-      "Botni guruhga qo'shing — u avtomatik shu ro'yxatga tushadi.",
-      "Bot guruhda xabar yubora olishi uchun unga ruxsat berilgan bo'lishi kerak.",
-    ].join("\n");
-  }
-
-  const lines = chats.map(
-    (chat, index) => `${index + 1}. ${escapeHtml(chat.title)}`,
-  );
-  return [`📋 <b>${chats.length} ta guruh</b>`, "", ...lines].join("\n");
-};
-
-export const askMessage = (current: string | null): string =>
-  [
-    "📝 <b>Yuboriladigan xabarni yozing.</b>",
-    "",
-    current === null
-      ? "<i>Hozircha xabar yo'q.</i>"
-      : `Hozirgi: <i>${escapeHtml(preview(current))}</i>`,
-    "",
-    "Keyingi xabaringiz matn sifatida qabul qilinadi.",
-  ].join("\n");
-
-export const askInterval = (current: number): string =>
-  [
-    "⏱ <b>Interval necha daqiqa bo'lsin?</b>",
-    "",
-    `Hozirgi: <b>${current}</b> daqiqa`,
-    `Ruxsat etilgan: ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES}`,
-    "",
-    "Pastdagi tugmalardan tanlang yoki sonni yozib yuboring.",
-  ].join("\n");
-
-export const broadcastReport = (result: BroadcastResult): string => {
+const report = (
+  language: BotLanguage,
+  result: BroadcastResult,
+  labels: {
+    readonly title: string;
+    readonly success: string;
+    readonly failed: string;
+    readonly failedGroups: string;
+    readonly reason: string;
+    readonly action: string;
+    readonly more: (count: number) => string;
+  },
+): string => {
   const lines = [
-    "<b>📤 Yuborildi</b>",
-    "",
-    `✅ Muvaffaqiyatli: <b>${result.sent}</b>`,
-    `❌ Xato: <b>${result.failed}</b>`,
+    `<b>${labels.title}</b>`, "",
+    `✅ ${labels.success}: <b>${result.sent}</b>`,
+    `❌ ${labels.failed}: <b>${result.failed}</b>`,
   ];
-
   if (result.failures.length > 0) {
-    lines.push("", "<b>Xatolar:</b>");
+    lines.push("", `<b>⚠️ ${labels.failedGroups}:</b>`);
     for (const failure of result.failures.slice(0, 10)) {
-      lines.push(`• ${escapeHtml(failure.group)} — ${escapeHtml(failure.reason)}`);
+      const explanation = deliveryErrorText(language, failure.code);
+      lines.push(
+        "", `• <b>${escapeHtml(failure.group)}</b>`,
+        `  ${labels.reason}: ${escapeHtml(explanation.reason)}`,
+        `  ${labels.action}: ${escapeHtml(explanation.action)}`,
+      );
     }
-    if (result.failures.length > 10) {
-      lines.push(`<i>…yana ${result.failures.length - 10} ta</i>`);
-    }
+    if (result.failures.length > 10) lines.push(`<i>${labels.more(result.failures.length - 10)}</i>`);
   }
-
   return lines.join("\n");
 };
 
-export const NO_GROUPS =
-  "⚠️ Avval botni kamida bitta guruhga qo'shing.";
-export const NO_MESSAGE =
-  "⚠️ Avval 📝 tugmasi orqali xabar matnini belgilang.";
-export const STARTED = "▶️ Boshlandi. Belgilangan vaqtda yuborib turaman.";
-export const STOPPED = "⏹ To'xtatildi.";
-export const MESSAGE_SAVED = "✅ Xabar saqlandi.";
-export const INTERVAL_SAVED = (minutes: number): string =>
-  `✅ Interval ${minutes} daqiqaga o'rnatildi.`;
-export const INVALID_INTERVAL = `⚠️ ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES} oralig'ida son yuboring.`;
-export const GROUP_ADDED = (title: string): string =>
-  `✅ <b>${escapeHtml(title)}</b> guruhi qo'shildi.`;
-export const GROUP_REMOVED = (title: string): string =>
-  `➖ <b>${escapeHtml(title)}</b> guruhi ro'yxatdan chiqarildi.`;
+const uz: BotTexts = {
+  locale: "uz-Latn-UZ",
+  buttons: {
+    message: "📝 Xabar", interval: "⏱ Interval", groups: "📋 Guruhlar",
+    sendNow: "📤 Hozir yuborish", start: "▶️ Boshlash", stop: "⏹ To‘xtatish",
+    refresh: "🔄 Yangilash", back: "⬅️ Orqaga", language: "🌐 Til",
+    contact: "📱 Telefon raqamimni yuborish",
+  },
+  commands: {
+    start: "Botni ishga tushirish", menu: "Bosh menyu", status: "Hozirgi holat",
+    help: "Yordam", language: "Tilni tanlash",
+  },
+  welcome: [
+    "👋 <b>Assalomu alaykum!</b>", "",
+    "Bu bot tanlangan guruhlarga xabaringizni belgilangan intervalda avtomatik yuboradi.", "",
+    "<b>Qanday ishlaydi:</b>",
+    "1️⃣ Botni guruhga qo‘shing va xabar yuborish huquqini bering",
+    "2️⃣ 📝 tugmasi orqali xabar yozing", "3️⃣ ⏱ orqali intervalni tanlang",
+    "4️⃣ ▶️ <b>Boshlash</b> tugmasini bosing",
+  ].join("\n"),
+  help: [
+    "<b>Buyruqlar</b>", "", "/start — botni ishga tushirish", "/menu — bosh menyu",
+    "/status — hozirgi sozlamalar", "/language — tilni tanlash", "/help — yordam", "",
+    `Interval ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES} daqiqa bo‘lishi kerak.`,
+  ].join("\n"),
+  languageTitle: "🌐 <b>Tilni tanlang</b>",
+  languageChanged: "✅ Til o‘zgartirildi.",
+  contactNotYours: "⚠️ Faqat o‘zingizning Telegram kontaktingizni yuboring.",
+  usernameRequired: "⚠️ Telegram akkauntingizga username o‘rnating va /start ni qayta bosing.",
+  accessDetailsMismatch: "⛔️ Telefon raqami va Telegram username admin kiritgan ma’lumotlarga mos kelmadi.",
+  accessGranted: "✅ Ruxsat tasdiqlandi. Botdan foydalanishingiz mumkin.",
+  accessRevoked: "⛔️ Botdan foydalanish ruxsatingiz faol emas.",
+  noGroups: "⚠️ Avval botni kamida bitta guruhga qo‘shing.",
+  noMessage: "⚠️ Avval 📝 tugmasi orqali xabar matnini belgilang.",
+  started: "▶️ Boshlandi. Belgilangan vaqtda yuboraman.",
+  stopped: "⏹ To‘xtatildi.",
+  messageSaved: "✅ Xabar saqlandi.",
+  invalidMessage: "⚠️ Xabar bo‘sh bo‘lmasligi va ruxsat etilgan uzunlikdan oshmasligi kerak.",
+  invalidInterval: `⚠️ ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES} oralig‘ida son yuboring.`,
+  sending: "📤 Yuborilmoqda...",
+  serverError: "⚠️ Serverda vaqtinchalik xato yuz berdi. Birozdan keyin qayta urinib ko‘ring.",
+  minuteShort: "daq",
+  accessDenied: (payment) => {
+    const holder = payment.cardHolder ? `\nKarta egasi: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
+    return [
+      "🔒 <b>Botdan foydalanish uchun ruxsat kerak</b>", "", "To‘lovni quyidagi kartaga yuboring:",
+      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
+      `Chekni ${escapeHtml(payment.adminContact)} ga yuboring. Admin telefon raqamingiz va Telegram username’ingizni tizimga qo‘shadi.`, "",
+      "So‘ng pastdagi tugma orqali o‘z kontaktingizni yuboring. Tilni /language orqali almashtirish mumkin.",
+    ].join("\n");
+  },
+  statusCard: (subscriber, chatCount) => {
+    const state = subscriber.active ? "🟢 Ishlayapti" : "⚪️ To‘xtatilgan";
+    const message = subscriber.message === null ? "<i>hali belgilanmagan</i>" : escapeHtml(preview(subscriber.message));
+    return [
+      "<b>📊 Holat</b>", "", `Rejim: ${state}`, `Guruhlar: <b>${chatCount}</b> ta`,
+      `Interval: har <b>${subscriber.intervalMinutes}</b> daqiqada`,
+      `Keyingi: ${clock(subscriber.nextRunAt, "uz-Latn-UZ")}`,
+      `Oxirgi: ${clock(subscriber.lastRunAt, "uz-Latn-UZ")}`, "", "<b>📝 Xabar:</b>", message,
+    ].join("\n");
+  },
+  groupList: (chats) => chats.length === 0
+    ? ["📋 <b>Guruhlar yo‘q</b>", "", "Botni guruhga qo‘shing — u avtomatik ro‘yxatga tushadi.", "Botga xabar yuborish huquqini bering."].join("\n")
+    : [`📋 <b>${chats.length} ta guruh</b>`, "", ...chats.map((chat, i) => `${i + 1}. ${escapeHtml(chat.title)}`)].join("\n"),
+  askMessage: (current) => [
+    "📝 <b>Yuboriladigan xabarni yozing.</b>", "",
+    current === null ? "<i>Hozircha xabar yo‘q.</i>" : `Hozirgi: <i>${escapeHtml(preview(current))}</i>`, "",
+    "Keyingi xabaringiz matn sifatida qabul qilinadi.",
+  ].join("\n"),
+  askInterval: (current) => [
+    "⏱ <b>Interval necha daqiqa bo‘lsin?</b>", "", `Hozirgi: <b>${current}</b> daqiqa`,
+    `Ruxsat etilgan: ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES}`, "",
+    "Tugmalardan tanlang yoki son yuboring.",
+  ].join("\n"),
+  intervalSaved: (minutes) => `✅ Interval ${minutes} daqiqaga o‘rnatildi.`,
+  groupAdded: (title) => `✅ <b>${escapeHtml(title)}</b> guruhi qo‘shildi.`,
+  groupRemoved: (title) => `➖ <b>${escapeHtml(title)}</b> guruhi ro‘yxatdan chiqarildi.`,
+  broadcastReport: (result) => report("uz", result, {
+    title: "📤 Yuborildi", success: "Muvaffaqiyatli", failed: "Xato",
+    failedGroups: "Yuborilmagan guruhlar", reason: "Sabab", action: "Yechim",
+    more: (count) => `…yana ${count} ta`,
+  }),
+};
+
+const ru: BotTexts = {
+  locale: "ru-RU",
+  buttons: {
+    message: "📝 Сообщение", interval: "⏱ Интервал", groups: "📋 Группы",
+    sendNow: "📤 Отправить сейчас", start: "▶️ Запустить", stop: "⏹ Остановить",
+    refresh: "🔄 Обновить", back: "⬅️ Назад", language: "🌐 Язык",
+    contact: "📱 Отправить мой номер",
+  },
+  commands: {
+    start: "Запустить бота", menu: "Главное меню", status: "Текущий статус",
+    help: "Помощь", language: "Выбрать язык",
+  },
+  welcome: [
+    "👋 <b>Здравствуйте!</b>", "",
+    "Бот автоматически отправляет ваше сообщение в выбранные группы с заданным интервалом.", "",
+    "<b>Как это работает:</b>",
+    "1️⃣ Добавьте бота в группу и разрешите отправку сообщений",
+    "2️⃣ Введите сообщение через кнопку 📝", "3️⃣ Выберите интервал через ⏱",
+    "4️⃣ Нажмите ▶️ <b>Запустить</b>",
+  ].join("\n"),
+  help: [
+    "<b>Команды</b>", "", "/start — запустить бота", "/menu — главное меню",
+    "/status — текущие настройки", "/language — выбрать язык", "/help — помощь", "",
+    `Интервал должен быть от ${MIN_BROADCAST_INTERVAL_MINUTES} до ${MAX_BROADCAST_INTERVAL_MINUTES} минут.`,
+  ].join("\n"),
+  languageTitle: "🌐 <b>Выберите язык</b>",
+  languageChanged: "✅ Язык изменён.",
+  contactNotYours: "⚠️ Отправьте только свой контакт Telegram.",
+  usernameRequired: "⚠️ Установите username в Telegram и снова отправьте /start.",
+  accessDetailsMismatch: "⛔️ Номер телефона и Telegram username не совпали с данными администратора.",
+  accessGranted: "✅ Доступ подтверждён. Ботом можно пользоваться.",
+  accessRevoked: "⛔️ Ваш доступ к боту неактивен.",
+  noGroups: "⚠️ Сначала добавьте бота хотя бы в одну группу.",
+  noMessage: "⚠️ Сначала задайте текст через кнопку 📝 Сообщение.",
+  started: "▶️ Запущено. Сообщения будут отправляться по расписанию.",
+  stopped: "⏹ Остановлено.",
+  messageSaved: "✅ Сообщение сохранено.",
+  invalidMessage: "⚠️ Сообщение не должно быть пустым или превышать допустимую длину.",
+  invalidInterval: `⚠️ Отправьте число от ${MIN_BROADCAST_INTERVAL_MINUTES} до ${MAX_BROADCAST_INTERVAL_MINUTES}.`,
+  sending: "📤 Отправка...",
+  serverError: "⚠️ Временная ошибка сервера. Попробуйте ещё раз немного позже.",
+  minuteShort: "мин",
+  accessDenied: (payment) => {
+    const holder = payment.cardHolder ? `\nВладелец карты: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
+    return [
+      "🔒 <b>Для использования бота нужен доступ</b>", "", "Отправьте оплату на карту:",
+      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
+      `После оплаты отправьте чек ${escapeHtml(payment.adminContact)}. Администратор добавит ваш номер и Telegram username.`, "",
+      "Затем отправьте свой контакт кнопкой ниже. Язык можно изменить командой /language.",
+    ].join("\n");
+  },
+  statusCard: (subscriber, chatCount) => {
+    const state = subscriber.active ? "🟢 Работает" : "⚪️ Остановлено";
+    const message = subscriber.message === null ? "<i>ещё не задано</i>" : escapeHtml(preview(subscriber.message));
+    return [
+      "<b>📊 Статус</b>", "", `Режим: ${state}`, `Группы: <b>${chatCount}</b>`,
+      `Интервал: каждые <b>${subscriber.intervalMinutes}</b> мин`,
+      `Следующая: ${clock(subscriber.nextRunAt, "ru-RU")}`,
+      `Последняя: ${clock(subscriber.lastRunAt, "ru-RU")}`, "", "<b>📝 Сообщение:</b>", message,
+    ].join("\n");
+  },
+  groupList: (chats) => chats.length === 0
+    ? ["📋 <b>Групп нет</b>", "", "Добавьте бота в группу — она появится здесь автоматически.", "Разрешите боту отправлять сообщения."].join("\n")
+    : [`📋 <b>Групп: ${chats.length}</b>`, "", ...chats.map((chat, i) => `${i + 1}. ${escapeHtml(chat.title)}`)].join("\n"),
+  askMessage: (current) => [
+    "📝 <b>Введите сообщение для отправки.</b>", "",
+    current === null ? "<i>Сообщение ещё не задано.</i>" : `Сейчас: <i>${escapeHtml(preview(current))}</i>`, "",
+    "Следующее сообщение будет сохранено как текст рассылки.",
+  ].join("\n"),
+  askInterval: (current) => [
+    "⏱ <b>Какой интервал установить?</b>", "", `Сейчас: <b>${current}</b> мин`,
+    `Допустимо: ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES}`, "",
+    "Выберите кнопку или отправьте число.",
+  ].join("\n"),
+  intervalSaved: (minutes) => `✅ Интервал установлен: ${minutes} мин.`,
+  groupAdded: (title) => `✅ Группа <b>${escapeHtml(title)}</b> добавлена.`,
+  groupRemoved: (title) => `➖ Группа <b>${escapeHtml(title)}</b> удалена из списка.`,
+  broadcastReport: (result) => report("ru", result, {
+    title: "📤 Отправлено", success: "Успешно", failed: "Ошибок",
+    failedGroups: "Неотправленные группы", reason: "Причина", action: "Решение",
+    more: (count) => `…ещё ${count}`,
+  }),
+};
+
+const en: BotTexts = {
+  locale: "en-GB",
+  buttons: {
+    message: "📝 Message", interval: "⏱ Interval", groups: "📋 Groups",
+    sendNow: "📤 Send now", start: "▶️ Start", stop: "⏹ Stop",
+    refresh: "🔄 Refresh", back: "⬅️ Back", language: "🌐 Language",
+    contact: "📱 Share my phone number",
+  },
+  commands: {
+    start: "Start the bot", menu: "Main menu", status: "Current status",
+    help: "Help", language: "Choose language",
+  },
+  welcome: [
+    "👋 <b>Welcome!</b>", "",
+    "This bot automatically sends your message to selected groups at a chosen interval.", "",
+    "<b>How it works:</b>",
+    "1️⃣ Add the bot to a group and allow it to send messages",
+    "2️⃣ Enter your message with the 📝 button", "3️⃣ Choose an interval with ⏱",
+    "4️⃣ Press ▶️ <b>Start</b>",
+  ].join("\n"),
+  help: [
+    "<b>Commands</b>", "", "/start — start the bot", "/menu — main menu",
+    "/status — current settings", "/language — choose language", "/help — help", "",
+    `The interval must be between ${MIN_BROADCAST_INTERVAL_MINUTES} and ${MAX_BROADCAST_INTERVAL_MINUTES} minutes.`,
+  ].join("\n"),
+  languageTitle: "🌐 <b>Choose a language</b>",
+  languageChanged: "✅ Language changed.",
+  contactNotYours: "⚠️ Please share only your own Telegram contact.",
+  usernameRequired: "⚠️ Set a Telegram username and send /start again.",
+  accessDetailsMismatch: "⛔️ The phone number and Telegram username do not match the administrator’s records.",
+  accessGranted: "✅ Access confirmed. You can now use the bot.",
+  accessRevoked: "⛔️ Your access to the bot is not active.",
+  noGroups: "⚠️ First add the bot to at least one group.",
+  noMessage: "⚠️ First set a message using the 📝 Message button.",
+  started: "▶️ Started. Messages will be sent on schedule.",
+  stopped: "⏹ Stopped.",
+  messageSaved: "✅ Message saved.",
+  invalidMessage: "⚠️ The message cannot be empty or exceed the allowed length.",
+  invalidInterval: `⚠️ Send a number between ${MIN_BROADCAST_INTERVAL_MINUTES} and ${MAX_BROADCAST_INTERVAL_MINUTES}.`,
+  sending: "📤 Sending...",
+  serverError: "⚠️ A temporary server error occurred. Please try again a little later.",
+  minuteShort: "min",
+  accessDenied: (payment) => {
+    const holder = payment.cardHolder ? `\nCard holder: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
+    return [
+      "🔒 <b>Access is required to use this bot</b>", "", "Send payment to this card:",
+      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
+      `After payment, send the receipt to ${escapeHtml(payment.adminContact)}. The administrator will add your phone number and Telegram username.`, "",
+      "Then share your contact using the button below. Use /language to change the language.",
+    ].join("\n");
+  },
+  statusCard: (subscriber, chatCount) => {
+    const state = subscriber.active ? "🟢 Running" : "⚪️ Stopped";
+    const message = subscriber.message === null ? "<i>not set yet</i>" : escapeHtml(preview(subscriber.message));
+    return [
+      "<b>📊 Status</b>", "", `Mode: ${state}`, `Groups: <b>${chatCount}</b>`,
+      `Interval: every <b>${subscriber.intervalMinutes}</b> min`,
+      `Next: ${clock(subscriber.nextRunAt, "en-GB")}`,
+      `Last: ${clock(subscriber.lastRunAt, "en-GB")}`, "", "<b>📝 Message:</b>", message,
+    ].join("\n");
+  },
+  groupList: (chats) => chats.length === 0
+    ? ["📋 <b>No groups</b>", "", "Add the bot to a group and it will appear here automatically.", "Allow the bot to send messages."].join("\n")
+    : [`📋 <b>${chats.length} groups</b>`, "", ...chats.map((chat, i) => `${i + 1}. ${escapeHtml(chat.title)}`)].join("\n"),
+  askMessage: (current) => [
+    "📝 <b>Enter the message to send.</b>", "",
+    current === null ? "<i>No message has been set.</i>" : `Current: <i>${escapeHtml(preview(current))}</i>`, "",
+    "Your next message will be saved as the broadcast text.",
+  ].join("\n"),
+  askInterval: (current) => [
+    "⏱ <b>What interval should be used?</b>", "", `Current: <b>${current}</b> min`,
+    `Allowed: ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES}`, "",
+    "Choose a button or send a number.",
+  ].join("\n"),
+  intervalSaved: (minutes) => `✅ Interval set to ${minutes} minutes.`,
+  groupAdded: (title) => `✅ Group <b>${escapeHtml(title)}</b> added.`,
+  groupRemoved: (title) => `➖ Group <b>${escapeHtml(title)}</b> removed from the list.`,
+  broadcastReport: (result) => report("en", result, {
+    title: "📤 Sent", success: "Successful", failed: "Failed",
+    failedGroups: "Groups not reached", reason: "Reason", action: "Solution",
+    more: (count) => `…${count} more`,
+  }),
+};
+
+const catalogs = { uz, ru, en } as const satisfies Readonly<Record<BotLanguage, BotTexts>>;
+
+export const getTexts = (language: BotLanguage): BotTexts => catalogs[language];
+
+export const detectLanguage = (languageCode: string | undefined): BotLanguage => {
+  const code = languageCode?.toLowerCase() ?? "";
+  if (code.startsWith("ru")) return "ru";
+  if (code.startsWith("en")) return "en";
+  return "uz";
+};
+
+export const broadcastReport = (
+  result: BroadcastResult,
+  language: BotLanguage = "uz",
+): string => getTexts(language).broadcastReport(result);

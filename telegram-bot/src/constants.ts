@@ -11,3 +11,6 @@ export const MAX_MESSAGE_LENGTH = 4096;
 export const SCHEDULER_TICK_MS = 15_000;
 
 export const MS_PER_MINUTE = 60_000;
+
+/** Monthly access price used by CRM billing analytics. */
+export const ACCESS_MONTH_PRICE_UZS = 100_000;

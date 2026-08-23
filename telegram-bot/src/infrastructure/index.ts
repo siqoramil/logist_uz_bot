@@ -7,3 +7,4 @@ export * from "./mongo";
 export * from "./mongo-chat-repository";
 export * from "./mongo-subscriber-repository";
 export * from "./scheduler";
+export * from "./telegram-delivery-error";

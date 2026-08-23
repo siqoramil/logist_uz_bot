@@ -3,7 +3,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, resolve } from "node:path";
 import type { AccessGrant } from "@domain";
-import { DomainError, isNonEmptyString } from "@domain";
+import { AccessInputError, DomainError, isNonEmptyString } from "@domain";
 import type { AccessRepository, Logger, SubscriberRepository } from "@ports";
 
 interface AdminServerOptions {
@@ -18,6 +18,15 @@ interface AdminServerOptions {
 
 const MAX_BODY_BYTES = 16_384;
 
+class AdminRequestError extends Error {
+  constructor(
+    readonly code: "request-too-large",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 const json = (res: ServerResponse, status: number, value: unknown): void => {
   const body = JSON.stringify(value);
   res.writeHead(status, {
@@ -27,6 +36,13 @@ const json = (res: ServerResponse, status: number, value: unknown): void => {
   });
   res.end(body);
 };
+
+const errorJson = (
+  res: ServerResponse,
+  status: number,
+  code: string,
+  error: string,
+): void => json(res, status, { code, error });
 
 const safeEqual = (left: string, right: string): boolean => {
   const a = createHash("sha256").update(left).digest();
@@ -60,7 +76,9 @@ const readBody = async (req: IncomingMessage): Promise<unknown> => {
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > MAX_BODY_BYTES) throw new Error("So'rov juda katta");
+    if (size > MAX_BODY_BYTES) {
+      throw new AdminRequestError("request-too-large", "So'rov hajmi juda katta");
+    }
     chunks.push(buffer);
   }
   if (chunks.length === 0) return {};
@@ -130,7 +148,7 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
   const server = createServer(async (req, res) => {
     const origin = req.headers.origin;
     if (origin && options.allowedOrigin && origin !== options.allowedOrigin) {
-      json(res, 403, { error: "Bu manbadan so'rovga ruxsat yo'q" });
+      errorJson(res, 403, "origin-forbidden", "Bu manbadan so'rovga ruxsat yo'q");
       return;
     }
     if (options.allowedOrigin && origin === options.allowedOrigin) {
@@ -147,13 +165,12 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
     const url = new URL(req.url ?? "/", "http://localhost");
     if (!url.pathname.startsWith("/api/")) {
       if (staticRoot && serveStatic(req, res, staticRoot)) return;
-      json(res, 404, { error: "Admin panel build topilmadi" });
+      errorJson(res, 404, "admin-build-missing", "Admin panel build topilmadi");
       return;
     }
 
     if (!authenticated(req, options.username, options.password)) {
-      res.setHeader("WWW-Authenticate", 'Basic realm="Logistic CRM"');
-      json(res, 401, { error: "Login yoki parol noto'g'ri" });
+      errorJson(res, 401, "invalid-credentials", "Login yoki parol noto'g'ri");
       return;
     }
 
@@ -176,12 +193,16 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
         });
         return;
       }
+      if (req.method === "GET" && url.pathname === "/api/analytics") {
+        json(res, 200, await access.analytics());
+        return;
+      }
       if (req.method === "POST" && url.pathname === "/api/access") {
         const body = asObject(await readBody(req));
         const username = body.username;
         const phone = body.phone;
         if (!isNonEmptyString(username) || !isNonEmptyString(phone)) {
-          json(res, 400, { error: "Username va telefonni to'g'ri kiriting" });
+          errorJson(res, 400, "missing-fields", "Username va telefonni to'g'ri kiriting");
           return;
         }
         const grant = await access.add(username, phone);
@@ -193,12 +214,12 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
       if (match && req.method === "PATCH") {
         const body = asObject(await readBody(req));
         if (typeof body.enabled !== "boolean") {
-          json(res, 400, { error: "enabled boolean bo'lishi kerak" });
+          errorJson(res, 400, "invalid-enabled", "enabled boolean bo'lishi kerak");
           return;
         }
         const grant = await access.setEnabled(match[1] ?? "", body.enabled);
         if (!grant) {
-          json(res, 404, { error: "Foydalanuvchi topilmadi" });
+          errorJson(res, 404, "access-not-found", "Foydalanuvchi topilmadi");
           return;
         }
         if (!grant.enabled) await stopIfRevoked(grant, access, subscribers);
@@ -208,7 +229,7 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
       if (match && req.method === "DELETE") {
         const grant = await access.remove(match[1] ?? "");
         if (!grant) {
-          json(res, 404, { error: "Foydalanuvchi topilmadi" });
+          errorJson(res, 404, "access-not-found", "Foydalanuvchi topilmadi");
           return;
         }
         await stopIfRevoked(grant, access, subscribers);
@@ -216,17 +237,33 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
         return;
       }
 
-      json(res, 404, { error: "Endpoint topilmadi" });
+      errorJson(res, 404, "endpoint-not-found", "Endpoint topilmadi");
     } catch (error) {
-      const message = error instanceof DomainError || error instanceof SyntaxError
-        ? error.message
-        : "Server xatosi";
-      if (!(error instanceof DomainError) && !(error instanceof SyntaxError)) {
-        logger.error("Admin API xatosi", error);
+      if (error instanceof AccessInputError) {
+        errorJson(res, 400, error.code, error.message);
+        return;
       }
-      json(res, error instanceof DomainError || error instanceof SyntaxError ? 400 : 500, {
-        error: message,
-      });
+      if (error instanceof AdminRequestError) {
+        errorJson(res, 413, error.code, error.message);
+        return;
+      }
+      if (error instanceof SyntaxError) {
+        errorJson(res, 400, "invalid-json", "So'rov ma'lumoti noto'g'ri formatda");
+        return;
+      }
+      if (error instanceof DomainError) {
+        errorJson(res, 400, "validation-error", error.message);
+        return;
+      }
+      const mongoCode = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+      if (mongoCode === 11000) {
+        errorJson(res, 409, "duplicate-access", "Username yoki telefon allaqachon mavjud");
+        return;
+      }
+      logger.error("Admin API xatosi", error);
+      errorJson(res, 500, "server-error", "Server xatosi");
     }
   });
 

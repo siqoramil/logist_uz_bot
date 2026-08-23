@@ -12,9 +12,10 @@ import {
   startAdminServer,
   startScheduler,
 } from "@infrastructure";
-import { broadcastReport, registerHandlers } from "@presentation";
+import { broadcastReport, getTexts, registerHandlers } from "@presentation";
 import {
   BroadcastForSubscriberUseCase,
+  ExpireAccessGrantsUseCase,
   ManageSubscriberUseCase,
   RunDueBroadcastsUseCase,
   TrackChatUseCase,
@@ -72,13 +73,22 @@ async function bootstrap(): Promise<void> {
     logger,
     async (subscriber, result) => {
       await bot.api
-        .sendMessage(subscriber.userId, broadcastReport(result), { parse_mode: "HTML" })
+        .sendMessage(subscriber.userId, broadcastReport(result, subscriber.language), { parse_mode: "HTML" })
         .catch(() => undefined);
     },
     access,
+    async (subscriber) => {
+      await bot.api
+        .sendMessage(subscriber.userId, getTexts(subscriber.language).serverError)
+        .catch(() => undefined);
+    },
   );
+  const expireAccess = new ExpireAccessGrantsUseCase(access, subscribers, logger);
 
-  startScheduler(() => runDue.execute(), logger, controller.signal);
+  startScheduler(async () => {
+    await expireAccess.execute();
+    await runDue.execute();
+  }, logger, controller.signal);
 
   const shutdown = async (): Promise<void> => {
     controller.abort();
@@ -91,12 +101,20 @@ async function bootstrap(): Promise<void> {
   process.once("SIGINT", () => void shutdown());
   process.once("SIGTERM", () => void shutdown());
 
-  await bot.api.setMyCommands([
-    { command: "start", description: "Botni ishga tushirish" },
-    { command: "menu", description: "Bosh menyu" },
-    { command: "status", description: "Hozirgi holat" },
-    { command: "help", description: "Yordam" },
-  ]);
+  const commands = (language: "uz" | "ru" | "en") => {
+    const descriptions = getTexts(language).commands;
+    return [
+      { command: "start", description: descriptions.start },
+      { command: "menu", description: descriptions.menu },
+      { command: "status", description: descriptions.status },
+      { command: "language", description: descriptions.language },
+      { command: "help", description: descriptions.help },
+    ];
+  };
+  await bot.api.setMyCommands(commands("uz"));
+  await bot.api.setMyCommands(commands("uz"), { language_code: "uz" });
+  await bot.api.setMyCommands(commands("ru"), { language_code: "ru" });
+  await bot.api.setMyCommands(commands("en"), { language_code: "en" });
 
   const me = await bot.api.getMe();
   logger.success(`Bot ishga tushdi: @${me.username}`);

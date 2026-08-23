@@ -61,7 +61,7 @@ export const loadConfig = (): AppConfig => ({
     MAX_BROADCAST_INTERVAL_MINUTES,
   ),
   adminUsername: requireEnv("ADMIN_USERNAME"),
-  adminPassword: requireMinLengthEnv("ADMIN_PASSWORD", 12),
+  adminPassword: requireMinLengthEnv("ADMIN_PASSWORD", 8),
   adminPort: optionalIntEnv("ADMIN_PORT", 3000, 1, 65_535),
   adminOrigin: optionalEnv("ADMIN_ORIGIN") ?? null,
   paymentCard: requireEnv("PAYMENT_CARD"),

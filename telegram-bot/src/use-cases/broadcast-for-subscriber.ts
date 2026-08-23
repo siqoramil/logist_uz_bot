@@ -34,7 +34,9 @@ export class BroadcastForSubscriberUseCase {
       } else {
         result = withFailure(result, {
           group: chat.title,
-          reason: outcome.reason ?? "noma'lum xato",
+          code: outcome.failure.code,
+          reason: outcome.failure.reason,
+          action: outcome.failure.action,
         });
         if (outcome.permanentFailure) {
           await this.chats.deactivate(chat.chatId);

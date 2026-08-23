@@ -4,14 +4,27 @@ import {
   MIN_BROADCAST_INTERVAL_MINUTES,
   MS_PER_MINUTE,
 } from "@constants";
-import { Guard, type Subscriber, type SubscriberState } from "@domain";
+import {
+  Guard,
+  type BotLanguage,
+  type Subscriber,
+  type SubscriberState,
+} from "@domain";
 import type { SubscriberRepository } from "@ports";
 
 export class ManageSubscriberUseCase {
   constructor(private readonly subscribers: SubscriberRepository) {}
 
-  register(userId: number, username: string | null): Promise<Subscriber> {
-    return this.subscribers.ensure(userId, username);
+  register(
+    userId: number,
+    username: string | null,
+    preferredLanguage: BotLanguage = "uz",
+  ): Promise<Subscriber> {
+    return this.subscribers.ensure(userId, username, preferredLanguage);
+  }
+
+  setLanguage(userId: number, language: BotLanguage): Promise<Subscriber> {
+    return this.subscribers.update(userId, { language });
   }
 
   setState(userId: number, state: SubscriberState): Promise<Subscriber> {
@@ -35,15 +48,19 @@ export class ManageSubscriberUseCase {
     return this.subscribers.update(userId, { intervalMinutes: minutes, state: "idle" });
   }
 
-  /** Starting schedules the first run one full interval out, not immediately. */
-  async start(subscriber: Subscriber): Promise<Subscriber> {
+  /** The handler sends immediately; this schedules every following run. */
+  async start(
+    subscriber: Subscriber,
+    startedAt: Date = new Date(),
+  ): Promise<Subscriber> {
     const nextRunAt = new Date(
-      Date.now() + subscriber.intervalMinutes * MS_PER_MINUTE,
+      startedAt.getTime() + subscriber.intervalMinutes * MS_PER_MINUTE,
     );
     return this.subscribers.update(subscriber.userId, {
       active: true,
       state: "idle",
       nextRunAt,
+      lastRunAt: startedAt,
     });
   }
 
