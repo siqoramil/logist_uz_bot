@@ -1,208 +1,114 @@
+name: logistic-bot
+
 services:
   mongo:
     image: mongo:8
-    container_name: logistic-bot-mongo
     restart: unless-stopped
-    command:
-      - --auth
-      - --wiredTigerCacheSizeGB=0.5
-      - --bind_ip_all
+    command: ["mongod", "--auth", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.5"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DB}
-    ports:
-      - "127.0.0.1:9099:27017"
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-logistic_bot}
+      MONGO_APP_USER: ${MONGO_APP_USER}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
     volumes:
-      - mongo-data:/data/db
-      - mongo-config:/data/configdb
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/10-app-user.js:ro
     healthcheck:
-      test:
-        - CMD
-        - mongosh
-        - --quiet
-        - -u
-        - ${MONGO_ROOT_USER}
-        - -p
-        - ${MONGO_ROOT_PASSWORD}
-        - --authenticationDatabase
-        - admin
-        - --eval
-        - "db.runCommand({ ping: 1 })"
+      test: ["CMD-SHELL", "mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 }).ok' | grep 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 20s
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    ulimits:
-      nofile:
-        soft: 64000
-        hard: 64000
-    networks:
-      - internal
-    logging:
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    logging: &logging
       driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      options: { max-size: "10m", max-file: "3" }
 
   redis:
     image: redis:8-alpine
-    container_name: logistic-bot-redis
     restart: unless-stopped
-    command:
-      - redis-server
-      - --requirepass
-      - ${REDIS_PASSWORD}
-      - --appendonly
-      - "yes"
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - allkeys-lru
-      - --save
-      - ""
-      - --io-threads
-      - "2"
-      - --protected-mode
-      - "yes"
-    ports:
-      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
-      - redis-data:/data
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - SETUID
-      - SETGID
-    read_only: true
-    tmpfs:
-      - /tmp:size=32m,mode=1777
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
       interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-    deploy:
-      resources:
-        limits:
-          memory: 384m
-    ulimits:
-      nofile:
-        soft: 10032
-        hard: 10032
-    networks:
-      - internal
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      timeout: 5s
+      retries: 10
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+    logging: *logging
 
   bot:
-    build:
-      context: .
-      cache_from:
-        - node:24-alpine
-    image: logistic-bot:latest
-    container_name: logistic-bot
+    image: ${BOT_IMAGE:-ghcr.io/siqoramil/logist-uz-bot:latest}
     restart: unless-stopped
     init: true
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m,mode=1777
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    ulimits:
-      nofile:
-        soft: 4096
-        hard: 8192
-      nproc: 1024
     depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
     environment:
       NODE_ENV: production
       NODE_OPTIONS: --enable-source-maps
       BOT_TOKEN: ${BOT_TOKEN}
-      BROADCAST_INTERVAL_MINUTES: ${BROADCAST_INTERVAL_MINUTES:-60}
-      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=admin
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      CONTROLLER_USER_ID: ${CONTROLLER_USER_ID}
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_ACCOUNT_SESSION: ${TELEGRAM_ACCOUNT_SESSION}
+      ACCOUNT_SEND_CONCURRENCY: ${ACCOUNT_SEND_CONCURRENCY:-10}
+      ACCOUNT_MAX_FLOOD_WAIT_SECONDS: ${ACCOUNT_MAX_FLOOD_WAIT_SECONDS:-300}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_PORT: 3000
-      ADMIN_ORIGIN: ${ADMIN_ORIGIN:-http://localhost:8080}
-      PAYMENT_CARD: ${PAYMENT_CARD}
-      PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER:-}
-      ADMIN_CONTACT: ${ADMIN_CONTACT}
-    expose:
-      - "3000"
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-    networks:
-      - internal
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      ADMIN_ORIGIN: ${ADMIN_ORIGIN}
+      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB:-logistic_bot}?authSource=${MONGO_DB:-logistic_bot}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_BROADCAST_LOCK_TTL_MS: ${REDIS_BROADCAST_LOCK_TTL_MS:-60000}
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    networks: [backend]
+    logging: *logging
 
   admin:
-    build:
-      context: ../admin
-    image: logistic-bot-admin:latest
-    container_name: logistic-bot-admin
+    image: ${ADMIN_IMAGE:-ghcr.io/siqoramil/logist-uz-admin:latest}
     restart: unless-stopped
     depends_on:
-      - bot
+      bot: { condition: service_healthy }
     ports:
-      - "127.0.0.1:8080:80"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
+      - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${ADMIN_HTTP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health | grep ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     read_only: true
     tmpfs:
       - /var/cache/nginx:size=16m
       - /var/run:size=4m
-    networks:
-      - internal
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "SETGID", "SETUID"]
+    networks: [backend]
+    logging: *logging
 
 volumes:
-  mongo-data:
-  mongo-config:
-  redis-data:
+  mongo_data:
+  mongo_config:
+  redis_data:
 
 networks:
-  internal:
+  backend:
     driver: bridge

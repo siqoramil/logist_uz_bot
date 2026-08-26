@@ -5,8 +5,8 @@ export interface AccessPayment {
 
 export interface AccessGrant {
   readonly id: string;
-  /** Lowercase Telegram username without @. */
-  readonly username: string;
+  /** Lowercase Telegram username without @; null when access is phone-only. */
+  readonly username: string | null;
   /** Phone containing digits only. */
   readonly phone: string;
   readonly enabled: boolean;

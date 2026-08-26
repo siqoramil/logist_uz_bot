@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.pem
 *.key
 *.crt
@@ -14,6 +15,7 @@ secrets/
 # Logs
 *.log
 logs/
+.data/
 
 # OS / editor
 .DS_Store

@@ -52,7 +52,6 @@ export interface BotTexts {
   readonly languageTitle: string;
   readonly languageChanged: string;
   readonly contactNotYours: string;
-  readonly usernameRequired: string;
   readonly accessDetailsMismatch: string;
   readonly accessGranted: string;
   readonly accessRevoked: string;
@@ -146,8 +145,7 @@ const uz: BotTexts = {
   languageTitle: "🌐 <b>Tilni tanlang</b>",
   languageChanged: "✅ Til o‘zgartirildi.",
   contactNotYours: "⚠️ Faqat o‘zingizning Telegram kontaktingizni yuboring.",
-  usernameRequired: "⚠️ Telegram akkauntingizga username o‘rnating va /start ni qayta bosing.",
-  accessDetailsMismatch: "⛔️ Telefon raqami va Telegram username admin kiritgan ma’lumotlarga mos kelmadi.",
+  accessDetailsMismatch: "⛔️ Bu telefon raqamiga admin tomonidan ruxsat berilmagan yoki ma’lumotlar mos kelmadi.",
   accessGranted: "✅ Ruxsat tasdiqlandi. Botdan foydalanishingiz mumkin.",
   accessRevoked: "⛔️ Botdan foydalanish ruxsatingiz faol emas.",
   noGroups: "⚠️ Avval botni kamida bitta guruhga qo‘shing.",
@@ -165,7 +163,7 @@ const uz: BotTexts = {
     return [
       "🔒 <b>Botdan foydalanish uchun ruxsat kerak</b>", "", "To‘lovni quyidagi kartaga yuboring:",
       `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `Chekni ${escapeHtml(payment.adminContact)} ga yuboring. Admin telefon raqamingiz va Telegram username’ingizni tizimga qo‘shadi.`, "",
+      `Chekni ${escapeHtml(payment.adminContact)} ga yuboring. Admin telefon raqamingizga ruxsat beradi; username majburiy emas.`, "",
       "So‘ng pastdagi tugma orqali o‘z kontaktingizni yuboring. Tilni /language orqali almashtirish mumkin.",
     ].join("\n");
   },
@@ -230,8 +228,7 @@ const ru: BotTexts = {
   languageTitle: "🌐 <b>Выберите язык</b>",
   languageChanged: "✅ Язык изменён.",
   contactNotYours: "⚠️ Отправьте только свой контакт Telegram.",
-  usernameRequired: "⚠️ Установите username в Telegram и снова отправьте /start.",
-  accessDetailsMismatch: "⛔️ Номер телефона и Telegram username не совпали с данными администратора.",
+  accessDetailsMismatch: "⛔️ Администратор не разрешил этот номер или данные не совпадают.",
   accessGranted: "✅ Доступ подтверждён. Ботом можно пользоваться.",
   accessRevoked: "⛔️ Ваш доступ к боту неактивен.",
   noGroups: "⚠️ Сначала добавьте бота хотя бы в одну группу.",
@@ -249,7 +246,7 @@ const ru: BotTexts = {
     return [
       "🔒 <b>Для использования бота нужен доступ</b>", "", "Отправьте оплату на карту:",
       `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `После оплаты отправьте чек ${escapeHtml(payment.adminContact)}. Администратор добавит ваш номер и Telegram username.`, "",
+      `После оплаты отправьте чек ${escapeHtml(payment.adminContact)}. Администратор разрешит ваш номер; username необязателен.`, "",
       "Затем отправьте свой контакт кнопкой ниже. Язык можно изменить командой /language.",
     ].join("\n");
   },
@@ -314,8 +311,7 @@ const en: BotTexts = {
   languageTitle: "🌐 <b>Choose a language</b>",
   languageChanged: "✅ Language changed.",
   contactNotYours: "⚠️ Please share only your own Telegram contact.",
-  usernameRequired: "⚠️ Set a Telegram username and send /start again.",
-  accessDetailsMismatch: "⛔️ The phone number and Telegram username do not match the administrator’s records.",
+  accessDetailsMismatch: "⛔️ The admin has not allowed this phone number, or the details do not match.",
   accessGranted: "✅ Access confirmed. You can now use the bot.",
   accessRevoked: "⛔️ Your access to the bot is not active.",
   noGroups: "⚠️ First add the bot to at least one group.",
@@ -333,7 +329,7 @@ const en: BotTexts = {
     return [
       "🔒 <b>Access is required to use this bot</b>", "", "Send payment to this card:",
       `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `After payment, send the receipt to ${escapeHtml(payment.adminContact)}. The administrator will add your phone number and Telegram username.`, "",
+      `After payment, send the receipt to ${escapeHtml(payment.adminContact)}. The administrator will approve your phone number; a username is optional.`, "",
       "Then share your contact using the button below. Use /language to change the language.",
     ].join("\n");
   },

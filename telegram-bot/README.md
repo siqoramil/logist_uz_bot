@@ -1,551 +1,89 @@
-# Logistic Bot
+# Logistic Account Sender
 
-Многопользовательский Telegram-бот для рассылки сообщений по группам с закрытым доступом и административной CRM. Администратор создаёт пару из имени пользователя Telegram и номера телефона, а клиент подтверждает принадлежность данных через собственный Telegram-контакт.
+Bitta boshqaruvchi Telegram bot orqali maxsus ishchi Telegram accountdagi barcha guruhlarga matn tarqatadi.
 
-## Основные возможности
+## Ishlash tartibi
 
-- индивидуальные сообщение, список групп и интервал рассылки для каждого клиента;
-- закрытый доступ по заранее созданной паре `username + телефон`;
-- подтверждение номера только через контакт, принадлежащий текущему пользователю Telegram;
-- добавление, блокировка, повторная активация и удаление доступов через React CRM;
-- управление рассылкой кнопками внутри Telegram;
-- интервалы от 5 минут до 24 часов;
-- ручная отправка сообщения вне расписания;
-- автоматическое отключение недоступных групп;
-- личный отчёт после каждой рассылки;
-- устойчивый планировщик без наложения параллельных циклов;
-- корректная остановка Telegram-бота, HTTP-сервера и подключения к MongoDB.
+1. Admin boshqaruvchi botga matn yuboradi.
+2. Ishchi account o‘zi a’zo bo‘lgan guruhlarni Telegram API orqali oladi.
+3. Xabar guruhlarga ketma-ket, xavfsiz pauza bilan yuboriladi.
+4. Bot progress va yakuniy xatolar hisobotini UZ/RU/EN tilida ko‘rsatadi.
 
-## Как работает доступ
+Bir vaqtning o‘zida ikkinchi tarqatish boshlanmaydi. Joriy ishni `/cancel` orqali to‘xtatish mumkin.
 
-1. Клиент оплачивает услугу и отправляет подтверждение администратору.
-2. Администратор добавляет в CRM имя пользователя Telegram и номер телефона клиента одной записью.
-3. Клиент отправляет боту команду `/start`.
-4. Бот предлагает отправить номер телефона кнопкой Telegram.
-5. Бот проверяет, что контакт принадлежит отправителю, а username и телефон совпадают с активной записью CRM.
-6. После успешной проверки доступ связывается с Telegram ID клиента.
+## Sozlash
 
-При последующих обращениях бот проверяет не только Telegram ID, но и текущее имя пользователя. Если имя изменилось, доступ необходимо актуализировать через CRM.
-
-Блокировка или удаление записи в CRM немедленно останавливает активную рассылку связанного клиента и очищает время следующего запуска.
-
-## Как работает рассылка
-
-1. Авторизованный пользователь добавляет бота в нужные группы.
-2. Бот сохраняет каждую группу за пользователем, который его добавил.
-3. Пользователь задаёт текст сообщения и интервал.
-4. После нажатия кнопки запуска планировщик начинает рассылку.
-5. Сообщения отправляются последовательно с паузой в одну секунду.
-6. После завершения пользователь получает отчёт об успешных отправках и ошибках.
-
-> В Telegram Bot API нет метода для получения полного списка групп бота. Поэтому бот знает только о группах, в которые его добавили вручную и по которым он получил событие `my_chat_member`.
-
-Если Telegram сообщает, что бот удалён из группы или больше не может отправлять туда сообщения, группа автоматически помечается неактивной.
-
-## Ограничения
-
-- Бота необходимо вручную добавить в каждую группу.
-- Для отправки сообщений у бота должны быть соответствующие права в группе.
-- Одна группа закрепляется за пользователем, который добавил бота последним.
-- Проверка расписания выполняется раз в 15 секунд, поэтому возможна задержка запуска до 15 секунд.
-- Длина сообщения ограничена 4096 символами.
-- Частые одинаковые отправки во множество групп могут привести к ограничениям Telegram.
-
-## Технологии
-
-| Технология | Версия | Назначение |
-| --- | --- | --- |
-| Node.js | 24 | Среда выполнения |
-| TypeScript | 6.x | Строгая типизация и сборка |
-| grammY | 1.45.x | Работа с Telegram Bot API |
-| MongoDB | 8 | Хранение пользователей, групп и доступов |
-| Mongoose | 9.x | Модели и репозитории MongoDB |
-| tsx | 4.x | Запуск TypeScript в режиме разработки |
-| React CRM | отдельный проект | Управление доступами |
-| Docker Compose | — | Запуск всей инфраструктуры |
-
-## Требования
-
-Для локальной разработки понадобятся:
-
-- Node.js 24;
-- Yarn через Corepack;
-- MongoDB 8 или совместимая версия;
-- токен Telegram-бота от [@BotFather](https://t.me/BotFather).
-
-Проверить установленные версии:
-
-```bash
-node --version
-yarn --version
-docker --version
-docker compose version
-```
-
-Если Yarn недоступен:
-
-```bash
-corepack enable
-```
-
-## Установка
-
-```bash
-git clone <адрес-репозитория>
-cd Logistic-Bot/telegram-bot
-yarn install
-```
-
-## Создание Telegram-бота
-
-1. Откройте [@BotFather](https://t.me/BotFather) в Telegram.
-2. Отправьте команду `/newbot`.
-3. Укажите отображаемое имя и уникальное имя пользователя бота.
-4. Скопируйте полученный токен в переменную `BOT_TOKEN`.
-
-Токен нельзя публиковать в Git, журналах и сообщениях. Если он был раскрыт, отзовите его через BotFather и создайте новый.
-
-## Настройка окружения
-
-Создайте локальный файл конфигурации:
-
-```bash
-cp .env.example .env
-```
-
-Заполните значения в `.env`.
-
-### Переменные приложения
-
-| Переменная | Обязательна | Значение по умолчанию | Описание |
-| --- | --- | --- | --- |
-| `BOT_TOKEN` | Да | — | Токен Telegram-бота от BotFather |
-| `MONGODB_URI` | Да | — | Полная строка подключения к MongoDB |
-| `BROADCAST_INTERVAL_MINUTES` | Нет | `60` | Интервал новых клиентов в минутах, допустимо `5..1440` |
-| `ADMIN_USERNAME` | Да | — | Логин администратора CRM |
-| `ADMIN_PASSWORD` | Да | — | Пароль CRM длиной не менее 8 символов |
-| `ADMIN_PORT` | Нет | `3000` | Порт административного HTTP API, допустимо `1..65535` |
-| `ADMIN_ORIGIN` | Нет | CORS не включён | Единственный разрешённый origin CRM |
-| `PAYMENT_CARD` | Да | — | Номер карты, показываемый клиенту без доступа |
-| `PAYMENT_CARD_HOLDER` | Нет | — | Имя владельца платёжной карты |
-| `ADMIN_CONTACT` | Да | — | Контакт администратора, например `@admin_username` |
-
-### Переменные Docker Compose
-
-| Переменная | Назначение |
-| --- | --- |
-| `MONGO_ROOT_USER` | Пользователь MongoDB |
-| `MONGO_ROOT_PASSWORD` | Пароль MongoDB |
-| `MONGO_DB` | Имя базы данных приложения |
-| `REDIS_PASSWORD` | Пароль контейнера Redis |
-| `REDIS_URL` | Зарезервированный адрес Redis; приложение пока его не использует |
-
-MongoDB при запуске через Compose доступна хост-машине только на `127.0.0.1:9099`, Redis — на `127.0.0.1:6379`, а CRM — на `127.0.0.1:8080`.
-
-## Локальный запуск
-
-### 1. Запустить MongoDB
-
-Самый простой вариант — поднять только контейнер базы данных:
-
-```bash
-docker compose up -d mongo
-```
-
-Для этого в `.env` должны быть заполнены `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD` и `MONGO_DB`.
-
-### 2. Запустить Telegram-бот и API
-
-```bash
-yarn dev
-```
-
-Для автоматического перезапуска после изменения TypeScript-файлов:
-
-```bash
-yarn dev:watch
-```
-
-Административный API по умолчанию будет доступен на `http://localhost:3000/api`.
-
-### 3. Запустить CRM
-
-В отдельном терминале:
-
-```bash
-cd ../admin
-yarn install
-yarn dev
-```
-
-CRM откроется на `http://localhost:5173`. Для этого режима укажите в `.env` бота:
+`telegram-bot/.env` ichiga quyidagilarni qo‘shing:
 
 ```dotenv
-ADMIN_ORIGIN=http://localhost:5173
+BOT_TOKEN=BotFather_token
+CONTROLLER_USER_ID=admin_telegram_numeric_id
+TELEGRAM_API_ID=my_telegram_org_api_id
+TELEGRAM_API_HASH=my_telegram_org_api_hash
+TELEGRAM_ACCOUNT_SESSION=private_string_session
+
+ACCOUNT_SEND_CONCURRENCY=10
+ACCOUNT_MAX_FLOOD_WAIT_SECONDS=300
+ADMIN_USERNAME=admin@example.com
+ADMIN_PASSWORD=replace_with_a_strong_initial_password
+ADMIN_PORT=3000
+MONGODB_URI=mongodb://app_user:strong_password@mongo-host:27017/logistic_bot?authSource=logistic_bot
+REDIS_PASSWORD=replace_with_strong_password
+REDIS_URL=redis://:replace_with_strong_password@redis-host:6379
+REDIS_BROADCAST_LOCK_TTL_MS=60000
 ```
 
-Vite перенаправляет запросы `/api` на `http://localhost:3000`.
+Lokal MongoDB va Redis'ni ishga tushirish:
 
-## Сборка и запуск приложения
+```bash
+yarn infra:up
+```
 
-Создать JavaScript-сборку в каталоге `dist/`:
+Productionda `MONGODB_URI` va `REDIS_URL` ni boshqariladigan, autentifikatsiyali servis URL'lariga almashtiring. MongoDB user/access/analytics va til sozlamalarini saqlaydi. Redis broadcast lock va oxirgi hisobotni saqlaydi.
+
+`TELEGRAM_API_ID` va `TELEGRAM_API_HASH` [my.telegram.org/apps](https://my.telegram.org/apps) orqali olinadi.
+
+Session yaratish:
+
+```bash
+yarn session
+```
+
+Telefon, Telegram kodi va kerak bo‘lsa 2FA parol kiritiladi. Chiqqan qiymatni `TELEGRAM_ACCOUNT_SESSION` ga yozing. Session accountga to‘liq kirish huquqini beradi: uni parol kabi maxfiy saqlang va Git’ga commit qilmang.
+
+## Ishga tushirish
+
+```bash
+yarn dev
+```
+
+Production:
 
 ```bash
 yarn build
-```
-
-Запустить собранное приложение:
-
-```bash
 yarn start
 ```
 
-При сборке `tsc-alias` заменяет алиасы TypeScript относительными путями, поэтому `node dist/index.js` работает без дополнительных загрузчиков.
+Eski multi-user bot vaqtincha saqlangan va kerak bo‘lsa `yarn dev:legacy` bilan ishga tushadi.
 
-Если предварительно выполнить `yarn build` в каталоге `../admin`, встроенный HTTP-сервер найдёт `../admin/dist` и сможет раздавать CRM вместе с API. Для такого режима используйте:
+## Bot buyruqlari
 
-```dotenv
-ADMIN_ORIGIN=http://localhost:3000
-```
+- `/start` — holat va qisqa ko‘rsatma
+- `/groups` — ishchi accountdagi guruhlar soni
+- `/cancel` — joriy tarqatishni to‘xtatish
+- `/help` — yordam
 
-После запуска откройте `http://localhost:3000`.
+Faqat `CONTROLLER_USER_ID` egasi botni boshqara oladi. Hozircha faqat matnli xabar qo‘llab-quvvatlanadi.
 
-## Запуск через Docker Compose
+## Telegram limitlari
 
-Подготовьте `.env`, затем запустите MongoDB, Redis, Telegram-бот и CRM:
+Xabarlar barcha guruhlarga `ACCOUNT_SEND_CONCURRENCY` bo‘yicha parallel yuboriladi. Telegram `FLOOD_WAIT` qaytarsa, dastur ruxsat etilgan vaqtgacha kutadi; account cheklansa tarqatishni to‘xtatadi.
 
-```bash
-docker compose up -d --build
-```
+Telegram API’dan flooding yoki spam uchun foydalanish accountning butunlay bloklanishiga olib kelishi mumkin. Faqat xabar olishga rozilik bergan ishchi guruhlardan foydalaning.
 
-CRM откроется по адресу:
-
-```text
-http://localhost:8080
-```
-
-Для Docker-конфигурации используйте:
-
-```dotenv
-ADMIN_ORIGIN=http://localhost:8080
-```
-
-Полезные команды:
-
-```bash
-# Состояние контейнеров
-docker compose ps
-
-# Журналы всех сервисов
-docker compose logs -f
-
-# Журналы бота и CRM
-docker compose logs -f bot admin
-
-# Перезапуск бота
-docker compose restart bot
-
-# Остановка контейнеров без удаления данных
-docker compose down
-```
-
-Данные MongoDB и Redis сохраняются в именованных томах. Команда `docker compose down` их не удаляет.
-
-## Команды проекта
-
-| Команда | Назначение |
-| --- | --- |
-| `yarn dev` | Однократный запуск TypeScript через `tsx` |
-| `yarn dev:watch` | Разработка с перезапуском через `nodemon` |
-| `yarn build` | Компиляция TypeScript и замена алиасов |
-| `yarn start` | Запуск `dist/index.js` |
-| `yarn smoke` | Интеграционная проверка бизнес-сценариев с MongoDB |
-
-## Использование бота
-
-Доступные команды Telegram:
-
-| Команда | Назначение |
-| --- | --- |
-| `/start` | Проверить доступ и открыть основную панель |
-| `/menu` | Открыть основное меню |
-| `/status` | Показать текущее состояние рассылки |
-| `/help` | Показать справку |
-
-Основная панель выглядит примерно так:
-
-```text
-📊 Holat
-
-Rejim:    🟢 Ishlayapti
-Guruhlar: 12 ta
-Interval: har 60 daqiqada
-Keyingi:  16:30, 14/08
-Oxirgi:   15:30, 14/08
-
-📝 Xabar:
-Yuk bor: Toshkent → Samarqand
-
-[📝 Xabar]      [⏱ Interval]
-[📋 Guruhlar]   [📤 Hozir yuborish]
-[⏹ To'xtatish]
-[🔄 Yangilash]
-```
-
-Интерфейс Telegram-бота написан на узбекском языке. Все пользовательские тексты находятся в `src/presentation/texts.ts`.
-
-### Изменение сообщения
-
-Нажмите кнопку `📝 Xabar` и отправьте новый текст. Пустые сообщения и тексты длиннее 4096 символов отклоняются.
-
-### Изменение интервала
-
-Нажмите `⏱ Interval` и выберите готовое значение `15`, `30`, `60`, `120`, `240` или `480` минут. Также можно отправить произвольное целое значение от 5 до 1440 минут.
-
-### Добавление группы
-
-Добавьте бота в группу или супергруппу. Если пользователь авторизован, группа появится в его списке. Если доступа нет, бот уведомит пользователя и покинет группу.
-
-### Запуск и остановка
-
-Для запуска должны быть заданы сообщение и хотя бы одна активная группа. Кнопка `📤 Hozir yuborish` выполняет разовую отправку, а `▶️ Boshlash` включает расписание. Кнопка `⏹ To'xtatish` останавливает последующие запуски.
-
-## CRM и административный API
-
-API использует HTTP Basic Authentication со значениями `ADMIN_USERNAME` и `ADMIN_PASSWORD`. Ответы возвращаются в JSON и снабжаются заголовком `Cache-Control: no-store`.
-
-| Метод | Маршрут | Назначение |
-| --- | --- | --- |
-| `GET` | `/api/session` | Проверить учётные данные администратора |
-| `GET` | `/api/access` | Получить список доступов |
-| `POST` | `/api/access` | Добавить или повторно активировать пару username и телефона |
-| `PATCH` | `/api/access/:id` | Изменить поле `enabled` |
-| `DELETE` | `/api/access/:id` | Удалить доступ |
-| `GET` | `/api/stats` | Получить статистику CRM |
-
-Тело запроса на добавление доступа:
-
-```json
-{
-  "username": "client_name",
-  "phone": "+998 90 123 45 67"
-}
-```
-
-Требования к данным:
-
-- имя пользователя после удаления `@` и приведения к нижнему регистру должно содержать от 5 до 32 латинских букв, цифр или символов `_`;
-- телефон нормализуется до 7–15 цифр;
-- один username или телефон не может принадлежать разным записям;
-- размер JSON-тела ограничен 16 КБ;
-- идентификатор доступа должен быть корректным MongoDB ObjectId.
-
-## Архитектура
-
-Проект использует гексагональную архитектуру, также известную как Ports and Adapters. Зависимости направлены к бизнес-логике:
-
-```text
-presentation  →  use-cases  →  ports  ←  infrastructure
-                     ↓
-                   domain
-```
-
-- `domain` — бизнес-типы, ошибки, правила нормализации и проверки;
-- `ports` — интерфейсы репозиториев, отправки сообщений и журналирования;
-- `use-cases` — регистрация, настройки, группы и рассылки;
-- `infrastructure` — MongoDB, grammY, планировщик и административный HTTP-сервер;
-- `presentation` — команды, обработчики и тексты Telegram-интерфейса.
-
-Бизнес-сценарии не зависят напрямую от grammY или Mongoose, поэтому инфраструктуру можно заменять тестовыми реализациями.
-
-## Структура проекта
-
-```text
-src/
-├── index.ts                                  # сборка зависимостей и запуск приложения
-├── constants.ts                              # интервалы, лимиты и период планировщика
-├── domain/
-│   ├── access-grant.ts                       # модель доступа и нормализация данных
-│   ├── broadcast-result.ts                   # результат рассылки
-│   ├── errors.ts                             # доменные ошибки
-│   ├── guard.ts                              # общая валидация
-│   ├── managed-chat.ts                       # группа Telegram
-│   ├── subscriber.ts                         # настройки клиента
-│   └── index.ts                              # публичный экспорт слоя
-├── ports/
-│   ├── access-repository.ts                  # интерфейс хранилища доступов
-│   ├── broadcaster.ts                        # интерфейс отправки сообщений
-│   ├── chat-repository.ts                    # интерфейс хранилища групп
-│   ├── logger.ts                             # интерфейс журнала
-│   ├── subscriber-repository.ts              # интерфейс хранилища клиентов
-│   └── index.ts                              # публичный экспорт слоя
-├── use-cases/
-│   ├── broadcast-for-subscriber.ts           # рассылка одного клиента
-│   ├── manage-subscriber.ts                  # сообщение, интервал и запуск
-│   ├── run-due-broadcasts.ts                 # выполнение запланированных рассылок
-│   ├── track-chat.ts                         # добавление и удаление групп
-│   └── index.ts                              # публичный экспорт слоя
-├── infrastructure/
-│   ├── admin-server.ts                       # CRM API и раздача статических файлов
-│   ├── env-config.ts                         # чтение и проверка `.env`
-│   ├── grammy-broadcaster.ts                 # адаптер Telegram Bot API
-│   ├── mongo-access-repository.ts            # доступы в MongoDB
-│   ├── mongo-chat-repository.ts              # группы в MongoDB
-│   ├── mongo-subscriber-repository.ts        # клиенты в MongoDB
-│   ├── mongo.ts                              # подключение к MongoDB
-│   ├── scheduler.ts                          # планировщик без наложения циклов
-│   ├── console-logger.ts                     # вывод журналов в консоль
-│   └── index.ts                              # публичный экспорт слоя
-└── presentation/
-    ├── bot.ts                                # обработчики grammY
-    ├── texts.ts                              # тексты на узбекском языке
-    └── index.ts                              # публичный экспорт слоя
-
-scripts/
-└── smoke.ts                                  # интеграционная проверка с MongoDB
-```
-
-## Алиасы импортов
-
-| Алиас | Файл или каталог |
-| --- | --- |
-| `@constants` | `src/constants.ts` |
-| `@domain` | `src/domain/index.ts` |
-| `@ports` | `src/ports/index.ts` |
-| `@use-cases` | `src/use-cases/index.ts` |
-| `@infrastructure` | `src/infrastructure/index.ts` |
-| `@presentation` | `src/presentation/index.ts` |
-
-Импорты между слоями выполняются через публичные `index.ts`, а внутри одного слоя используются относительные пути.
-
-## Модель данных
-
-### Коллекция `subscribers`
-
-| Поле | Описание |
-| --- | --- |
-| `userId` | Уникальный Telegram ID клиента |
-| `username` | Текущее имя пользователя Telegram |
-| `message` | Текст рассылки или `null` |
-| `intervalMinutes` | Интервал в минутах |
-| `active` | Включено ли расписание |
-| `state` | `idle`, `awaiting-message` или `awaiting-interval` |
-| `nextRunAt` | Следующий запуск или `null` |
-| `lastRunAt` | Время предыдущего запуска или `null` |
-
-### Коллекция `managedchats`
-
-| Поле | Описание |
-| --- | --- |
-| `chatId` | Уникальный ID группы Telegram |
-| `ownerId` | Telegram ID владельца записи |
-| `title` | Название группы |
-| `active` | Доступна ли группа для рассылки |
-
-### Коллекция `accessgrants`
-
-| Поле | Описание |
-| --- | --- |
-| `username` | Нормализованное имя пользователя без `@` |
-| `phone` | Нормализованный номер телефона |
-| `enabled` | Активен ли доступ |
-| `linkedUserId` | Telegram ID после подтверждения контакта |
-| `linkedUsername` | Имя пользователя в момент подтверждения |
-| `createdAt` / `updatedAt` | Даты создания и обновления |
-
-## Надёжность планировщика
-
-- Планировщик проверяет готовые задачи каждые 15 секунд.
-- Новый цикл не начинается, пока не завершился предыдущий.
-- Перед отправкой `nextRunAt` переносится вперёд, а `lastRunAt` сохраняется.
-- Сбой посреди отправки не приводит к бесконечному повтору одного цикла.
-- Перед каждой запланированной рассылкой повторно проверяется доступ клиента.
-- При отзыве доступа расписание отключается автоматически.
-- Сигналы `SIGINT` и `SIGTERM` корректно останавливают все ресурсы.
-
-## Интеграционная проверка
-
-Запустите MongoDB и выполните:
-
-```bash
-yarn smoke
-```
-
-Сценарий использует реальную MongoDB, но заменяет Telegram тестовым отправителем. Он проверяет:
-
-- значения нового клиента;
-- нормализацию и подтверждение доступа;
-- добавление, удаление и повторное добавление групп;
-- проверку сообщения и интервала;
-- выборку запланированных задач;
-- успешные и ошибочные отправки;
-- отключение недоступных групп;
-- перенос следующего запуска;
-- остановку расписания.
-
-Тестовые документы удаляются самим скриптом после завершения.
-
-## Решение распространённых проблем
-
-### Ошибка `Missing env var`
-
-Приложение не нашло обязательную переменную. Сравните `.env` с `.env.example` и убедитесь, что команда запуска выполняется из каталога `telegram-bot`.
-
-### Ошибка минимальной длины пароля
-
-Значение `ADMIN_PASSWORD` должно содержать не менее 8 символов.
-
-### MongoDB не подключается
-
-Проверьте контейнер, порт и строку подключения:
-
-```bash
-docker compose ps mongo
-docker compose logs mongo
-```
-
-При локальном запуске адрес обычно содержит `localhost:9099`, а внутри Docker Compose используется имя сервиса `mongo:27017`.
-
-### Бот не запускается
-
-Проверьте `BOT_TOKEN` и журналы. Ошибка Telegram с кодом `401` обычно означает недействительный токен.
-
-### CRM получает ответ `403`
-
-Значение `ADMIN_ORIGIN` должно полностью совпадать с origin браузера, включая протокол и порт. Для разработки это обычно `http://localhost:5173`, для Docker — `http://localhost:8080`.
-
-### CRM получает ответ `401`
-
-Проверьте `ADMIN_USERNAME` и `ADMIN_PASSWORD`, затем перезапустите сервис бота.
-
-### Сообщения не приходят в группу
-
-Убедитесь, что бот всё ещё состоит в группе и имеет право отправлять сообщения. Подробная причина будет показана в личном отчёте пользователя и журналах приложения.
-
-## Безопасность
-
-- Никогда не добавляйте `.env` в Git.
-- Используйте уникальные длинные пароли для CRM, MongoDB и Redis.
-- Не публикуйте `BOT_TOKEN`.
-- Размещайте CRM и API за HTTPS.
-- Ограничивайте сетевой доступ к CRM, если она предназначена только для администратора.
-- В Docker Compose MongoDB, Redis и CRM привязаны к `127.0.0.1`, что предотвращает их прямую публикацию на внешних интерфейсах.
-- HTTP Basic Authentication не шифрует данные, поэтому вне локальной среды обязателен HTTPS.
-
-## Проверка перед публикацией
+## Tekshirish
 
 ```bash
 yarn build
-yarn smoke
-docker compose config
+yarn smoke:account
 ```
-
-Сборка и интеграционная проверка должны завершиться без ошибок, а `docker compose config` — показать ожидаемые сервисы и переменные.
-
-## Связанный проект
-
-React CRM находится в соседнем каталоге `../admin`. Её отдельная документация доступна в `../admin/README.md`.
-
-## Лицензия
-
-ISC

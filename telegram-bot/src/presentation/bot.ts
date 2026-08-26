@@ -99,7 +99,8 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
     const from = ctx.from;
     if (!from) return null;
     const language = await contextLanguage(ctx);
-    const authorized = await access.authorizeByUsername(from.id, from.username ?? null);
+    const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
+      (await access.authorizeByUsername(from.id, from.username ?? null));
     if (!authorized) {
       await showAccessDenied(ctx, language);
       return null;
@@ -136,7 +137,8 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
 
     if (isIn) {
       const language = await contextLanguage(ctx);
-      const authorized = await access.authorizeByUsername(from.id, from.username ?? null);
+      const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
+        (await access.authorizeByUsername(from.id, from.username ?? null));
       if (!authorized) {
         await ctx.api.sendMessage(from.id, getTexts(language).accessDenied(payment), HTML).catch(() => undefined);
         await ctx.api.leaveChat(chat.id).catch(() => undefined);
@@ -182,16 +184,16 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
       await ctx.reply(t.contactNotYours, { reply_markup: contactKeyboard(t) });
       return;
     }
-    if (!from.username) {
-      await ctx.reply(t.usernameRequired, { reply_markup: contactKeyboard(t) });
-      return;
-    }
-    const authorized = await access.authorizeByPhone(from.id, from.username, contact.phone_number);
+    const authorized = await access.authorizeByPhone(
+      from.id,
+      from.username ?? null,
+      contact.phone_number,
+    );
     if (!authorized) {
       await ctx.reply(t.accessDetailsMismatch, { reply_markup: contactKeyboard(t) });
       return;
     }
-    const subscriber = await manage.register(from.id, from.username, language);
+    const subscriber = await manage.register(from.id, from.username ?? null, language);
     await ctx.reply(getTexts(subscriber.language).accessGranted, { reply_markup: { remove_keyboard: true } });
     await showMenu(ctx, subscriber);
   });
@@ -209,7 +211,8 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
     const updated = await manage.setLanguage(subscriber.userId, language);
     const t = getTexts(language);
     await ctx.answerCallbackQuery(t.languageChanged);
-    const authorized = await access.authorizeByUsername(from.id, from.username ?? null);
+    const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
+      (await access.authorizeByUsername(from.id, from.username ?? null));
     if (authorized) {
       await showMenu(ctx, updated);
     } else {

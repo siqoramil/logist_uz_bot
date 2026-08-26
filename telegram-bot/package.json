@@ -1,20 +1,27 @@
 {
   "name": "logistic-bot",
   "version": "2.0.0",
-  "description": "Multi-user Telegram bot that periodically broadcasts each user's message to the groups they added it to",
-  "main": "dist/index.js",
+  "description": "Controller bot that broadcasts through a dedicated Telegram work account",
+  "main": "dist/account-main.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "dev:watch": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\"",
+    "dev": "tsx src/account-main.ts",
+    "dev:legacy": "tsx src/index.ts",
+    "dev:watch": "nodemon --watch src --ext ts --exec \"tsx src/account-main.ts\"",
     "build": "tsc && tsc-alias",
-    "start": "node dist/index.js",
-    "smoke": "tsx scripts/smoke.ts"
+    "start": "node dist/account-main.js",
+    "session": "tsx scripts/generate-account-session.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "smoke:account": "tsx scripts/account-smoke.ts",
+    "infra:up": "docker compose -f compose.yaml up -d --wait",
+    "infra:down": "docker compose -f compose.yaml down"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
     "grammy": "^1.45.1",
-    "mongoose": "^9.6.2"
+    "mongoose": "^9.6.2",
+    "redis": "^6.2.1",
+    "teleproto": "^1.228.5"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

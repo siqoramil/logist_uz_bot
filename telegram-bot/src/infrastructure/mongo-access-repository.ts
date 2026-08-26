@@ -15,7 +15,7 @@ interface AccessGrantDoc {
   /** Kept for compatibility with the previous unique Mongo index. */
   type: string;
   value: string;
-  username: string;
+  username?: string;
   phone: string;
   enabled: boolean;
   linkedUserId: number | null;
@@ -38,7 +38,7 @@ const AccessGrantSchema = new Schema<AccessGrantDoc>(
   {
     type: { type: String, required: true },
     value: { type: String, required: true },
-    username: { type: String, required: true },
+    username: { type: String, required: false },
     phone: { type: String, required: true },
     enabled: { type: Boolean, default: true, index: true },
     linkedUserId: { type: Number, default: null, index: true },
@@ -55,9 +55,19 @@ AccessGrantSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 const AccessGrantModel = model<AccessGrantDoc>("AccessGrant", AccessGrantSchema);
 
+interface DataMigrationDoc {
+  readonly key: string;
+  readonly completedAt: Date;
+}
+
+const DataMigrationModel = model<DataMigrationDoc>("DataMigration", new Schema({
+  key: { type: String, required: true, unique: true },
+  completedAt: { type: Date, required: true },
+}, { versionKey: false }));
+
 const toDomain = (doc: AccessGrantDoc): AccessGrant => ({
   id: doc._id.toString(),
-  username: doc.username,
+  username: doc.username ?? null,
   phone: doc.phone,
   enabled: doc.enabled,
   linkedUserId: doc.linkedUserId ?? null,
@@ -122,8 +132,50 @@ export class MongoAccessRepository implements AccessRepository {
     return this.migration;
   }
 
+  async importLegacy(grants: readonly AccessGrant[]): Promise<number> {
+    const migrationKey = "file-access-to-mongo-v1";
+    if (await DataMigrationModel.exists({ key: migrationKey })) return 0;
+    let imported = 0;
+    for (const grant of grants) {
+      const existing = await AccessGrantModel.exists({
+        type: "pair",
+        $or: [{ username: grant.username }, { phone: grant.phone }],
+      });
+      if (existing) continue;
+      try {
+        await AccessGrantModel.create({
+          ...(Types.ObjectId.isValid(grant.id) ? { _id: new Types.ObjectId(grant.id) } : {}),
+          type: "pair",
+          value: grant.username === null ? `phone:${grant.phone}` : `${grant.username}:${grant.phone}`,
+          ...(grant.username === null ? {} : { username: grant.username }),
+          phone: grant.phone,
+          enabled: grant.enabled,
+          linkedUserId: grant.linkedUserId,
+          linkedUsername: grant.linkedUsername,
+          expiresAt: grant.expiresAt,
+          billingHistory: grant.billingHistory.map((payment) => ({ ...payment })),
+          createdAt: grant.createdAt,
+          updatedAt: grant.updatedAt,
+        });
+        imported += 1;
+      } catch (error) {
+        const code = typeof error === "object" && error !== null && "code" in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+        if (code !== 11000) throw error;
+      }
+    }
+    await DataMigrationModel.updateOne(
+      { key: migrationKey },
+      { $setOnInsert: { key: migrationKey, completedAt: new Date() } },
+      { upsert: true },
+    ).exec();
+    return imported;
+  }
+
   async list(): Promise<AccessGrant[]> {
     await this.ensureLegacyFields();
+    await this.expireDue(new Date());
     const docs = await AccessGrantModel.find({ type: "pair" })
       .sort({ createdAt: -1 })
       .lean<AccessGrantDoc[]>()
@@ -131,19 +183,25 @@ export class MongoAccessRepository implements AccessRepository {
     return docs.map(toDomain);
   }
 
-  async add(rawUsername: string, rawPhone: string): Promise<AccessGrant> {
+  async add(rawUsername: string | null, rawPhone: string): Promise<AccessGrant> {
     await this.ensureLegacyFields();
-    const username = validateUsername(rawUsername);
+    const username = rawUsername === null || rawUsername.trim() === ""
+      ? null
+      : validateUsername(rawUsername);
     const phone = validatePhone(rawPhone);
     const now = new Date();
     const existing = await AccessGrantModel.findOne({
       type: "pair",
-      $or: [{ username }, { phone }],
+      $or: [
+        { phone },
+        ...(username === null ? [] : [{ username }]),
+      ],
     }).exec();
 
     if (existing) {
-      if (existing.username !== username || existing.phone !== phone) {
-        if (existing.username === username) {
+      const existingUsername = existing.username ?? null;
+      if (existingUsername !== username || existing.phone !== phone) {
+        if (username !== null && existingUsername === username) {
           throw new AccessInputError(
             "username-in-use",
             "Bu username boshqa telefon raqamiga biriktirilgan",
@@ -169,8 +227,8 @@ export class MongoAccessRepository implements AccessRepository {
 
     const doc = await AccessGrantModel.create({
       type: "pair",
-      value: `${username}:${phone}`,
-      username,
+      value: username === null ? `phone:${phone}` : `${username}:${phone}`,
+      ...(username === null ? {} : { username }),
       phone,
       enabled: true,
       expiresAt: addAccessMonth(now),
@@ -267,13 +325,11 @@ export class MongoAccessRepository implements AccessRepository {
 
   async isAuthorized(userId: number, username: string | null): Promise<boolean> {
     await this.ensureLegacyFields();
-    if (!username) return false;
     return (await AccessGrantModel.exists({
       type: "pair",
       enabled: true,
       expiresAt: { $gt: new Date() },
       linkedUserId: userId,
-      username: normalizeUsername(username),
     })) !== null;
   }
 
@@ -281,7 +337,21 @@ export class MongoAccessRepository implements AccessRepository {
     userId: number,
     username: string | null,
   ): Promise<boolean> {
-    return this.isAuthorized(userId, username);
+    await this.ensureLegacyFields();
+    if (!username) return false;
+    const linkedUsername = normalizeUsername(username);
+    const grant = await AccessGrantModel.findOneAndUpdate(
+      {
+        type: "pair",
+        enabled: true,
+        expiresAt: { $gt: new Date() },
+        username: linkedUsername,
+        $or: [{ linkedUserId: null }, { linkedUserId: userId }],
+      },
+      { $set: { linkedUserId: userId, linkedUsername } },
+      { returnDocument: "after" },
+    ).exec();
+    return grant !== null;
   }
 
   async authorizeByPhone(
@@ -291,16 +361,23 @@ export class MongoAccessRepository implements AccessRepository {
   ): Promise<boolean> {
     await this.ensureLegacyFields();
     const phone = normalizePhone(rawPhone);
-    if (!username || !/^\d{7,15}$/.test(phone)) return false;
-    const linkedUsername = normalizeUsername(username);
+    if (!/^\d{7,15}$/.test(phone)) return false;
+    const linkedUsername = username ? normalizeUsername(username) : null;
+    const identityConditions: Record<string, unknown>[] = [
+      { $or: [{ linkedUserId: null }, { linkedUserId: userId }] },
+    ];
+    if (linkedUsername !== null) {
+      identityConditions.push({
+        $or: [{ username: linkedUsername }, { username: { $exists: false } }, { username: null }],
+      });
+    }
     const doc = await AccessGrantModel.findOneAndUpdate(
       {
         type: "pair",
         enabled: true,
         expiresAt: { $gt: new Date() },
-        username: linkedUsername,
         phone,
-        $or: [{ linkedUserId: null }, { linkedUserId: userId }],
+        $and: identityConditions,
       },
       { $set: { linkedUserId: userId, linkedUsername } },
       { returnDocument: "after" },

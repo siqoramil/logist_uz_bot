@@ -2,6 +2,7 @@ import { Bot, GrammyError } from "grammy";
 import { DomainError } from "@domain";
 import {
   ConsoleLogger,
+  AdminCredentialStore,
   GrammyBroadcaster,
   MongoAccessRepository,
   MongoChatRepository,
@@ -34,6 +35,10 @@ async function bootstrap(): Promise<void> {
   const chats = new MongoChatRepository();
   const manage = new ManageSubscriberUseCase(subscribers);
   const trackChat = new TrackChatUseCase(chats, logger);
+  const adminCredentials = await AdminCredentialStore.initialize(
+    config.adminUsername,
+    config.adminPassword,
+  );
 
   const bot = new Bot(config.botToken);
   const broadcast = new BroadcastForSubscriberUseCase(
@@ -59,8 +64,7 @@ async function bootstrap(): Promise<void> {
 
   const stopAdminServer = startAdminServer({
     port: config.adminPort,
-    username: config.adminUsername,
-    password: config.adminPassword,
+    credentials: adminCredentials,
     allowedOrigin: config.adminOrigin,
     access,
     subscribers,

@@ -4,7 +4,7 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock ./
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+RUN --mount=type=cache,id=logistic-bot-yarn-dev,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn install --frozen-lockfile
 
 
@@ -21,9 +21,8 @@ FROM node:24-alpine AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock ./
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --frozen-lockfile --production && \
-    yarn cache clean
+RUN --mount=type=cache,id=logistic-bot-yarn-prod,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn install --frozen-lockfile --production
 
 
 FROM node:24-alpine AS runner
@@ -41,4 +40,4 @@ COPY --chown=node:node package.json ./
 USER node
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/account-main.js"]

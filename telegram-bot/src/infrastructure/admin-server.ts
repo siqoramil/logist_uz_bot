@@ -1,15 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, resolve } from "node:path";
 import type { AccessGrant } from "@domain";
 import { AccessInputError, DomainError, isNonEmptyString } from "@domain";
 import type { AccessRepository, Logger, SubscriberRepository } from "@ports";
+import type { AdminCredentialStore, AdminSession } from "./admin-credential-store";
 
 interface AdminServerOptions {
   readonly port: number;
-  readonly username: string;
-  readonly password: string;
+  readonly credentials: AdminCredentialStore;
   readonly allowedOrigin: string | null;
   readonly access: AccessRepository;
   readonly subscribers: SubscriberRepository;
@@ -44,29 +43,19 @@ const errorJson = (
   error: string,
 ): void => json(res, status, { code, error });
 
-const safeEqual = (left: string, right: string): boolean => {
-  const a = createHash("sha256").update(left).digest();
-  const b = createHash("sha256").update(right).digest();
-  return timingSafeEqual(a, b);
-};
-
-const authenticated = (
+const authenticate = async (
   req: IncomingMessage,
-  username: string,
-  password: string,
-): boolean => {
+  credentials: AdminCredentialStore,
+): Promise<AdminSession | null> => {
   const header = req.headers.authorization;
-  if (!header?.startsWith("Basic ")) return false;
+  if (!header?.startsWith("Basic ")) return null;
   try {
     const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
     const separator = decoded.indexOf(":");
-    if (separator < 0) return false;
-    return (
-      safeEqual(decoded.slice(0, separator), username) &&
-      safeEqual(decoded.slice(separator + 1), password)
-    );
+    if (separator < 0) return null;
+    return credentials.authenticate(decoded.slice(0, separator), decoded.slice(separator + 1));
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -169,14 +158,40 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
       return;
     }
 
-    if (!authenticated(req, options.username, options.password)) {
+    if (req.method === "GET" && url.pathname === "/api/health") {
+      json(res, 200, { status: "ok" });
+      return;
+    }
+
+    const adminSession = await authenticate(req, options.credentials);
+    if (!adminSession) {
       errorJson(res, 401, "invalid-credentials", "Login yoki parol noto'g'ri");
       return;
     }
 
     try {
       if (req.method === "GET" && url.pathname === "/api/session") {
-        json(res, 200, { username: options.username });
+        json(res, 200, adminSession);
+        return;
+      }
+      if (req.method === "PATCH" && url.pathname === "/api/profile") {
+        const body = asObject(await readBody(req));
+        const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+        const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+        const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+          errorJson(res, 400, "invalid-admin-username", "To'g'ri email manzil kiriting");
+          return;
+        }
+        if (newPassword.length < 8) {
+          errorJson(res, 400, "weak-password", "Yangi parol kamida 8 belgidan iborat bo'lishi kerak");
+          return;
+        }
+        if (!(await options.credentials.authenticate(adminSession.username, currentPassword))) {
+          errorJson(res, 400, "invalid-current-password", "Joriy parol noto'g'ri");
+          return;
+        }
+        json(res, 200, await options.credentials.update(username, newPassword));
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/access") {
@@ -199,10 +214,12 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
       }
       if (req.method === "POST" && url.pathname === "/api/access") {
         const body = asObject(await readBody(req));
-        const username = body.username;
+        const username = typeof body.username === "string" && body.username.trim() !== ""
+          ? body.username
+          : null;
         const phone = body.phone;
-        if (!isNonEmptyString(username) || !isNonEmptyString(phone)) {
-          errorJson(res, 400, "missing-fields", "Username va telefonni to'g'ri kiriting");
+        if (!isNonEmptyString(phone)) {
+          errorJson(res, 400, "missing-fields", "Telefon raqamini to'g'ri kiriting");
           return;
         }
         const grant = await access.add(username, phone);

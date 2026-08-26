@@ -2,7 +2,7 @@ import type { AccessAnalytics, AccessGrant } from "@domain";
 
 export interface AccessRepository {
   list(): Promise<AccessGrant[]>;
-  add(username: string, phone: string): Promise<AccessGrant>;
+  add(username: string | null, phone: string): Promise<AccessGrant>;
   setEnabled(id: string, enabled: boolean): Promise<AccessGrant | null>;
   expireDue(now: Date): Promise<AccessGrant[]>;
   analytics(now?: Date): Promise<AccessAnalytics>;

@@ -1,4 +1,7 @@
 export type DeliveryErrorCode =
+  | "account-write-forbidden"
+  | "account-not-member"
+  | "account-restricted"
   | "send-rights-missing"
   | "bot-kicked"
   | "bot-not-member"

@@ -10,6 +10,9 @@ type DeliveryErrorCatalog = Readonly<
 >;
 
 const uz = {
+  "account-write-forbidden": { reason: "Ishchi account bu guruhga xabar yoza olmaydi.", action: "Accountga yozish huquqini bering yoki guruh cheklovlarini tekshiring." },
+  "account-not-member": { reason: "Ishchi account bu guruh a’zosi emas yoki guruh yopilgan.", action: "Accountni guruhga qayta qo‘shing." },
+  "account-restricted": { reason: "Telegram ishchi accountning yuborishini vaqtincha chekladi.", action: "Tarqatishni to‘xtating, account cheklovini tekshiring va keyinroq davom eting." },
   "send-rights-missing": { reason: "Bot bu chatda xabar yuborish huquqiga ega emas.", action: "Botga xabar yuborish huquqini bering va uni qayta qo‘shing." },
   "bot-kicked": { reason: "Bot guruhdan chiqarib yuborilgan.", action: "Botni guruhga qayta qo‘shib, xabar yuborish huquqini bering." },
   "bot-not-member": { reason: "Bot hozir bu guruhning a’zosi emas.", action: "Botni guruhga qayta qo‘shing." },
@@ -40,6 +43,9 @@ const uz = {
 } as const satisfies DeliveryErrorCatalog;
 
 const ru = {
+  "account-write-forbidden": { reason: "Рабочий аккаунт не может отправлять сообщения в эту группу.", action: "Разрешите аккаунту писать или проверьте ограничения группы." },
+  "account-not-member": { reason: "Рабочий аккаунт не состоит в группе или группа закрыта.", action: "Добавьте аккаунт в группу заново." },
+  "account-restricted": { reason: "Telegram временно ограничил отправку с рабочего аккаунта.", action: "Остановите рассылку, проверьте ограничения аккаунта и продолжите позже." },
   "send-rights-missing": { reason: "У бота нет права отправлять сообщения в этот чат.", action: "Разрешите боту отправлять сообщения и добавьте его заново." },
   "bot-kicked": { reason: "Бота удалили из группы.", action: "Добавьте бота снова и разрешите отправку сообщений." },
   "bot-not-member": { reason: "Бот больше не состоит в этой группе.", action: "Добавьте бота в группу заново." },
@@ -70,6 +76,9 @@ const ru = {
 } as const satisfies DeliveryErrorCatalog;
 
 const en = {
+  "account-write-forbidden": { reason: "The work account cannot send messages to this group.", action: "Allow the account to post or check the group restrictions." },
+  "account-not-member": { reason: "The work account is not a member or the group is private.", action: "Add the account to the group again." },
+  "account-restricted": { reason: "Telegram temporarily restricted sending from the work account.", action: "Stop the broadcast, check the account restriction, and continue later." },
   "send-rights-missing": { reason: "The bot cannot send messages in this chat.", action: "Grant permission to send messages, then add the bot again." },
   "bot-kicked": { reason: "The bot was removed from the group.", action: "Add the bot again and allow it to send messages." },
   "bot-not-member": { reason: "The bot is no longer a member of this group.", action: "Add the bot to the group again." },
