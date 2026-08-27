@@ -1,7 +1,7 @@
 {
   "name": "logistic-bot",
   "version": "2.0.0",
-  "description": "Controller bot that broadcasts through a dedicated Telegram work account",
+  "description": "Multi-user controller bot that broadcasts through each user's own Telegram job account",
   "main": "dist/account-main.js",
   "type": "commonjs",
   "scripts": {
@@ -13,6 +13,7 @@
     "session": "tsx scripts/generate-account-session.ts",
     "smoke": "tsx scripts/smoke.ts",
     "smoke:account": "tsx scripts/account-smoke.ts",
+    "smoke:multi-account": "tsx scripts/multi-account-smoke.ts",
     "infra:up": "docker compose -f compose.yaml up -d --wait",
     "infra:down": "docker compose -f compose.yaml down"
   },

@@ -21,8 +21,12 @@ const main = async (): Promise<void> => {
       password: () => prompt.question("2FA parol (bo'lmasa Enter): "),
       onError: (error) => console.error("Login xatosi:", error.message),
     });
-    console.log("\nTELEGRAM_ACCOUNT_SESSION qiymati (maxfiy saqlang):");
-    console.log(client.session.save());
+    const account = await client.getMe();
+    const userId = account.id.toString();
+    const savedSession = client.session.save() as unknown as string;
+    console.log(`\nJob account Telegram ID: ${userId}`);
+    console.log("TELEGRAM_ACCOUNT_SESSIONS ichiga qo'shiladigan qiymat (maxfiy saqlang):");
+    console.log(JSON.stringify({ [userId]: savedSession }));
   } finally {
     prompt.close();
     await client.disconnect().catch(() => undefined);

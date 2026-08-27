@@ -1,20 +1,21 @@
 import { Bot, InlineKeyboard, Keyboard, type Context } from "grammy";
-import type { BotLanguage } from "@domain";
+import type { BotLanguage, Subscriber } from "@domain";
 import type { AccessRepository, Logger } from "@ports";
+import type { ManageSubscriberUseCase } from "@use-cases";
 import { broadcastReport, deliveryErrorText } from "@presentation";
-import {
-  TelegramAccountBroadcaster,
-  type AccountBroadcastResult,
-} from "./account-broadcaster";
+import type { AccountBroadcastResult } from "./account-broadcaster";
+import type { AccountBroadcasterRegistry } from "./account-broadcaster-registry";
 import { AccountLanguageStore } from "./language-store";
 import { getAccountTexts, type AccountControllerTexts } from "./texts";
 
 const HTML = { parse_mode: "HTML" } as const;
 
 export interface AccountControllerOptions {
-  readonly controllerUserId: number;
+  readonly controllerUserId: number | null;
   readonly access: AccessRepository;
-  readonly broadcaster: TelegramAccountBroadcaster;
+  readonly broadcaster: AccountBroadcasterRegistry;
+  readonly manage: ManageSubscriberUseCase;
+  readonly broadcastIntervalMinutes: number;
   readonly languageStore: AccountLanguageStore;
   readonly logger: Logger;
 }
@@ -70,14 +71,22 @@ export const registerAccountController = (
   bot: Bot,
   options: AccountControllerOptions,
 ): void => {
-  const { controllerUserId, access, broadcaster, languageStore, logger } = options;
+  const {
+    controllerUserId,
+    access,
+    broadcaster,
+    manage,
+    broadcastIntervalMinutes,
+    languageStore,
+    logger,
+  } = options;
   const languageOf = (ctx: Context): BotLanguage =>
     languageStore.get(ctx.from?.id, "ru");
 
   const isAuthorized = async (ctx: Context): Promise<boolean> => {
     const from = ctx.from;
     if (!from) return false;
-    if (from.id === controllerUserId) return true;
+    if (controllerUserId !== null && from.id === controllerUserId) return true;
     if (await access.isAuthorized(from.id, from.username ?? null)) return true;
     return access.authorizeByUsername(from.id, from.username ?? null);
   };
@@ -92,10 +101,25 @@ export const registerAccountController = (
     }).catch(() => undefined);
   };
 
-  const allowed = async (ctx: Context): Promise<boolean> => {
-    if (await isAuthorized(ctx)) return true;
-    await showDenied(ctx);
-    return false;
+  const allowed = async (ctx: Context): Promise<Subscriber | null> => {
+    const from = ctx.from;
+    if (!from || !(await isAuthorized(ctx))) {
+      await showDenied(ctx);
+      return null;
+    }
+    if (!broadcaster.hasAccount(from.id)) {
+      await ctx.reply(getAccountTexts(languageOf(ctx)).accountNotConfigured);
+      return null;
+    }
+    let subscriber = await manage.register(
+      from.id,
+      from.username ?? null,
+      languageOf(ctx),
+    );
+    if (subscriber.intervalMinutes !== broadcastIntervalMinutes) {
+      subscriber = await manage.setInterval(subscriber.userId, broadcastIntervalMinutes);
+    }
+    return subscriber;
   };
 
   bot.command("start", async (ctx) => {
@@ -122,6 +146,11 @@ export const registerAccountController = (
       await ctx.reply(t.accessDetailsMismatch, { reply_markup: contactKeyboard(t) });
       return;
     }
+    if (!broadcaster.hasAccount(from.id)) {
+      await ctx.reply(t.accountNotConfigured);
+      return;
+    }
+    await manage.register(from.id, from.username ?? null, languageOf(ctx));
     await ctx.reply(t.accessGranted, { reply_markup: { remove_keyboard: true } });
     await ctx.reply(t.ready, { reply_markup: mainMenu(t) });
   });
@@ -148,7 +177,9 @@ export const registerAccountController = (
     await languageStore.set(ctx.from.id, language);
     const t = getAccountTexts(language);
     await ctx.answerCallbackQuery(t.languageChanged);
-    if (await isAuthorized(ctx)) {
+    if (await isAuthorized(ctx) && broadcaster.hasAccount(ctx.from.id)) {
+      await manage.register(ctx.from.id, ctx.from.username ?? null, language);
+      await manage.setLanguage(ctx.from.id, language);
       await ctx.editMessageText(t.languageChanged, { reply_markup: mainMenu(t) });
     } else {
       await ctx.editMessageText(t.languageChanged);
@@ -164,30 +195,35 @@ export const registerAccountController = (
   });
 
   bot.callbackQuery("menu:cancel", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const t = getAccountTexts(languageOf(ctx));
     await ctx.answerCallbackQuery();
-    await ctx.reply(broadcaster.cancel() ? t.cancelRequested : t.canceled, {
+    const canceled = await broadcaster.cancel(subscriber.userId);
+    await manage.stop(subscriber.userId);
+    await ctx.reply(canceled ? t.cancelRequested : t.canceled, {
       reply_markup: mainMenu(t),
     });
   });
 
   bot.callbackQuery("menu:groups", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const t = getAccountTexts(languageOf(ctx));
     await ctx.answerCallbackQuery();
     const status = await ctx.reply(t.loadingGroups);
-    const count = await broadcaster.countGroups();
+    const count = await broadcaster.countGroups(subscriber.userId);
     await ctx.api.editMessageText(status.chat.id, status.message_id, t.groups(count), {
       reply_markup: mainMenu(t),
     });
   });
 
   bot.callbackQuery("report:sent", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const t = getAccountTexts(languageOf(ctx));
     await ctx.answerCallbackQuery();
-    const lastResult = await broadcaster.getLastResult();
+    const lastResult = await broadcaster.getLastResult(subscriber.userId);
     if (!lastResult) {
       await ctx.reply(t.noLastReport);
       return;
@@ -199,11 +235,12 @@ export const registerAccountController = (
   });
 
   bot.callbackQuery("report:failed", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const language = languageOf(ctx);
     const t = getAccountTexts(language);
     await ctx.answerCallbackQuery();
-    const lastResult = await broadcaster.getLastResult();
+    const lastResult = await broadcaster.getLastResult(subscriber.userId);
     if (!lastResult) {
       await ctx.reply(t.noLastReport);
       return;
@@ -218,23 +255,28 @@ export const registerAccountController = (
   });
 
   bot.command("groups", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const t = getAccountTexts(languageOf(ctx));
     const status = await ctx.reply(t.loadingGroups);
-    const count = await broadcaster.countGroups();
+    const count = await broadcaster.countGroups(subscriber.userId);
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, t.groups(count), {
       reply_markup: mainMenu(t),
     });
   });
 
   bot.command("cancel", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const t = getAccountTexts(languageOf(ctx));
-    await ctx.reply(broadcaster.cancel() ? t.cancelRequested : t.canceled);
+    const canceled = await broadcaster.cancel(subscriber.userId);
+    await manage.stop(subscriber.userId);
+    await ctx.reply(canceled ? t.cancelRequested : t.canceled);
   });
 
   bot.on("message:text", async (ctx) => {
-    if (!(await allowed(ctx))) return;
+    const subscriber = await allowed(ctx);
+    if (!subscriber) return;
     const language = languageOf(ctx);
     const t = getAccountTexts(language);
     const text = ctx.message.text.trim();
@@ -242,14 +284,26 @@ export const registerAccountController = (
       await ctx.reply(t.help);
       return;
     }
-    if (broadcaster.isRunning) {
+    if (text.length === 0) {
+      await ctx.reply(t.onlyText);
+      return;
+    }
+    if (await broadcaster.isRunning(subscriber.userId)) {
       await ctx.reply(t.alreadyRunning);
       return;
     }
 
     const status = await ctx.reply(t.loadingGroups);
+    const groupCount = await broadcaster.countGroups(subscriber.userId);
+    if (groupCount === 0) {
+      await manage.stop(subscriber.userId);
+      await ctx.api.editMessageText(ctx.chat.id, status.message_id, t.noGroups);
+      return;
+    }
+    const withMessage = await manage.setMessage(subscriber.userId, text);
+    await manage.start(withMessage);
     let lastProgressAt = 0;
-    const result = await broadcaster.execute(text, async (progress) => {
+    const result = await broadcaster.execute(subscriber.userId, text, async (progress) => {
       const now = Date.now();
       const shouldUpdate = progress.done === progress.total ||
         (progress.done % 10 === 0 && now - lastProgressAt >= 3_000);
@@ -262,16 +316,19 @@ export const registerAccountController = (
       ).catch(() => undefined);
     });
     if (result.total === 0) {
+      await manage.stop(subscriber.userId);
       await ctx.api.editMessageText(ctx.chat.id, status.message_id, t.noGroups);
       return;
     }
     if (result.canceled) {
+      await manage.stop(subscriber.userId);
       await ctx.api.editMessageText(ctx.chat.id, status.message_id, t.canceled).catch(() => undefined);
     }
     const details = [
       broadcastReport(result, language),
       "",
       t.summary(result.total, result.skipped, result.durationSeconds),
+      ...(result.canceled ? [] : ["", t.scheduled(broadcastIntervalMinutes)]),
     ].join("\n");
     await ctx.reply(details, { ...HTML, reply_markup: reportMenu(t, result) });
   });

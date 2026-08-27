@@ -21,13 +21,18 @@ return 0
 `;
 
 export class RedisBroadcastState {
-  private readonly lockKey = "logistic-bot:broadcast:lock";
-  private readonly resultKey = "logistic-bot:broadcast:last-result";
+  private readonly lockKey: string;
+  private readonly resultKey: string;
 
   constructor(
     private readonly redis: AppRedisClient,
     private readonly lockTtlMs: number,
-  ) {}
+    userId: number,
+  ) {
+    const prefix = `logistic-bot:account:${userId}:broadcast`;
+    this.lockKey = `${prefix}:lock`;
+    this.resultKey = `${prefix}:last-result`;
+  }
 
   async acquire(): Promise<BroadcastLease | null> {
     const token = randomUUID();

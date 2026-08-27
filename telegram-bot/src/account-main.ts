@@ -1,8 +1,6 @@
 import { Bot, GrammyError } from "grammy";
 import { resolve } from "node:path";
-import { TelegramClient } from "teleproto";
-import { StringSession } from "teleproto/sessions";
-import { ConfigurationError, DomainError } from "@domain";
+import { DomainError } from "@domain";
 import {
   ConsoleLogger,
   AdminCredentialStore,
@@ -14,12 +12,15 @@ import {
   disconnectMongo,
   disconnectRedis,
   startAdminServer,
+  startScheduler,
 } from "@infrastructure";
-import { TelegramAccountBroadcaster } from "./account/account-broadcaster";
+import { ExpireAccessGrantsUseCase, ManageSubscriberUseCase } from "@use-cases";
+import { AccountBroadcasterRegistry } from "./account/account-broadcaster-registry";
 import { loadAccountConfig } from "./account/config";
 import { registerAccountController } from "./account/controller";
 import { AccountLanguageStore } from "./account/language-store";
-import { RedisBroadcastState } from "./account/redis-broadcast-state";
+import { RunDueAccountBroadcastsUseCase } from "./account/run-due-account-broadcasts";
+import { broadcastReport, getTexts } from "@presentation";
 
 async function bootstrap(): Promise<void> {
   const config = loadAccountConfig();
@@ -29,38 +30,21 @@ async function bootstrap(): Promise<void> {
   const redis = await connectRedis(config.redisUrl, logger);
   logger.success("Redis ulandi");
 
-  const accountClient = new TelegramClient(
-    new StringSession(config.session),
-    config.apiId,
-    config.apiHash,
-    {
-      connectionRetries: 5,
-      floodSleepThreshold: config.maxFloodWaitSeconds,
-    },
-  );
-
-  await accountClient.connect();
-  if (!(await accountClient.checkAuthorization())) {
-    await accountClient.disconnect();
-    throw new ConfigurationError(
-      "TELEGRAM_ACCOUNT_SESSION yaroqsiz. Avval yarn session buyrug'ini ishlating.",
-    );
-  }
-
-  accountClient.setParseMode(undefined);
-  const workAccount = await accountClient.getMe();
-  logger.success(`Ishchi Telegram account ulandi: ${workAccount.id.toString()}`);
-
-  const broadcastState = new RedisBroadcastState(redis, config.redisBroadcastLockTtlMs);
-  const broadcaster = new TelegramAccountBroadcaster(accountClient, {
+  const broadcaster = new AccountBroadcasterRegistry({
+    apiId: config.apiId,
+    apiHash: config.apiHash,
+    sessions: config.sessions,
     sendConcurrency: config.sendConcurrency,
     maxFloodWaitSeconds: config.maxFloodWaitSeconds,
-  }, logger, broadcastState);
+    lockTtlMs: config.redisBroadcastLockTtlMs,
+  }, redis, logger);
+  logger.success(`${config.sessions.size} ta job account sessioni sozlangan`);
   const languageStore = await AccountLanguageStore.load(
     resolve(process.cwd(), ".data/account-settings.json"),
   );
   const adminAccess = new MongoAccessRepository();
   const adminSubscribers = new MongoSubscriberRepository();
+  const manage = new ManageSubscriberUseCase(adminSubscribers);
   const adminCredentials = await AdminCredentialStore.initialize(
     config.adminUsername,
     config.adminPassword,
@@ -82,9 +66,42 @@ async function bootstrap(): Promise<void> {
     controllerUserId: config.controllerUserId,
     access: adminAccess,
     broadcaster,
+    manage,
+    broadcastIntervalMinutes: config.broadcastIntervalMinutes,
     languageStore,
     logger,
   });
+
+  const expireAccess = new ExpireAccessGrantsUseCase(
+    adminAccess,
+    adminSubscribers,
+    logger,
+  );
+  const runDue = new RunDueAccountBroadcastsUseCase(
+    adminSubscribers,
+    adminAccess,
+    broadcaster,
+    logger,
+    async (subscriber, result) => {
+      await bot.api.sendMessage(
+        subscriber.userId,
+        broadcastReport(result, subscriber.language),
+        { parse_mode: "HTML" },
+      ).catch(() => undefined);
+    },
+    async (subscriber) => {
+      await bot.api.sendMessage(
+        subscriber.userId,
+        getTexts(subscriber.language).serverError,
+      ).catch(() => undefined);
+    },
+    config.controllerUserId,
+  );
+  const schedulerController = new AbortController();
+  startScheduler(async () => {
+    await expireAccess.execute();
+    await runDue.execute();
+  }, logger, schedulerController.signal);
 
   const commandDescriptions = {
     uz: ["Boshqaruvni boshlash", "Guruhlar soni", "Tarqatishni to‘xtatish", "Tilni tanlash", "Yordam"],
@@ -110,10 +127,10 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
-    broadcaster.cancel();
+    schedulerController.abort();
     await bot.stop().catch(() => undefined);
     await stopAdminServer().catch(() => undefined);
-    await accountClient.disconnect().catch(() => undefined);
+    await broadcaster.close().catch(() => undefined);
     await disconnectRedis(redis).catch(() => undefined);
     await disconnectMongo().catch(() => undefined);
     logger.info("To'xtatildi");
