@@ -1,37 +1,142 @@
 # Logistic Bot CRM
 
-Botdan foydalanish ruxsatlarini boshqaradigan admin panel.
+Административная панель для управления доступом клиентов к Telegram-боту Logistic Bot. Администратор добавляет связку Telegram username и номера телефона, после чего пользователь подтверждает эти данные своим контактом в Telegram.
 
-## Stack
+## Возможности
 
-- React 19 + TypeScript + Vite
-- Zustand — login sessiyasi
-- TanStack React Query — API cache va mutationlar
-- Tailwind CSS 4 — UI
-- i18next + react-i18next — ruscha va inglizcha interfeys
-- Feature-Sliced Design va `@app`, `@pages`, `@widgets`, `@features`, `@entities`, `@shared` aliaslari
+- вход администратора по логину и паролю;
+- просмотр общей статистики по доступам и клиентам бота;
+- добавление доступа по Telegram username и номеру телефона;
+- поиск по username, телефону и Telegram ID;
+- фильтрация активных и заблокированных записей;
+- блокировка и повторная активация доступа;
+- удаление доступа с подтверждением действия;
+- отображение статуса проверки пользователя в Telegram;
+- переключение интерфейса между русским и английским языками;
+- адаптивный интерфейс для компьютеров и мобильных устройств.
 
-## Ishga tushirish
+## Как работает проверка доступа
 
-Avval `telegram-bot` backendini ishga tushiring. Uning admin API porti standart holatda `3000`.
+1. Администратор получает оплату от клиента.
+2. В CRM создаётся единая запись с `@username` и номером телефона клиента.
+3. Клиент запускает Telegram-бота и отправляет свой контакт.
+4. Backend проверяет владельца контакта, номер телефона и текущий Telegram username.
+5. При полном совпадении запись связывается с Telegram ID, и клиент получает доступ к боту.
+
+Если доступ заблокирован или запись удалена, клиент больше не сможет пользоваться закрытыми функциями бота.
+
+## Технологии
+
+| Технология | Назначение |
+| --- | --- |
+| React 19 | Пользовательский интерфейс |
+| TypeScript 6 | Статическая типизация |
+| Vite 8 | Локальная разработка и production-сборка |
+| Tailwind CSS 4 | Стили и адаптивная вёрстка |
+| TanStack React Query 5 | Запросы к API, кеширование и мутации |
+| Zustand 5 | Состояние текущей сессии администратора |
+| i18next + react-i18next | Русская и английская локализация |
+| Oxlint | Статический анализ исходного кода |
+| Nginx | Раздача production-сборки и проксирование API |
+
+Проект организован по принципам Feature-Sliced Design.
+
+## Требования
+
+Для локальной разработки понадобятся:
+
+- Node.js 24 или совместимая актуальная версия;
+- Yarn, доступный через Corepack;
+- запущенный backend проекта `telegram-bot`;
+- MongoDB, настроенная на стороне backend.
+
+Проверить версии можно командами:
 
 ```bash
+node --version
+yarn --version
+```
+
+Если Yarn недоступен, включите Corepack:
+
+```bash
+corepack enable
+```
+
+## Установка
+
+Перейдите в каталог административной панели и установите зависимости:
+
+```bash
+cd admin
 yarn install
+```
+
+## Локальный запуск
+
+Сначала запустите backend `telegram-bot`. По умолчанию его административный API должен быть доступен на порту `3000`.
+
+Затем в каталоге `admin` выполните:
+
+```bash
 yarn dev
 ```
 
-Panel: `http://localhost:5173`. Vite `/api` so'rovlarini `http://localhost:3000` ga proxy qiladi.
+Панель откроется по адресу:
 
-Standart til — ruscha. `RU / EN` almashtirgichi orqali tanlangan til brauzerda saqlanadi.
+```text
+http://localhost:5173
+```
 
-Production build:
+В режиме разработки Vite автоматически перенаправляет запросы с `/api` на `http://localhost:3000`.
+
+Для корректной работы CORS в `.env` backend-проекта должен быть указан origin локальной CRM:
+
+```dotenv
+ADMIN_ORIGIN=http://localhost:5173
+```
+
+Для входа используйте значения `ADMIN_USERNAME` и `ADMIN_PASSWORD`, заданные в `.env` backend-проекта.
+
+## Переменные окружения
+
+Административная панель может работать через относительный путь `/api` либо обращаться к API по отдельному адресу.
+
+| Переменная | Обязательна | Значение по умолчанию | Описание |
+| --- | --- | --- | --- |
+| `VITE_API_URL` | Нет | Пустая строка | Базовый адрес backend без завершающего `/`, например `https://api.example.com` |
+
+Пример файла `.env.local`:
+
+```dotenv
+VITE_API_URL=https://api.example.com
+```
+
+В этом случае запрос проверки сессии будет отправлен на `https://api.example.com/api/session`.
+
+> Переменные Vite встраиваются в клиентскую сборку и доступны в браузере. Не храните в них пароли, токены и другие секреты.
+
+## Production-сборка
+
+Проверить типы и создать оптимизированную сборку:
 
 ```bash
 yarn build
+```
+
+Готовые статические файлы появятся в каталоге `dist/`.
+
+Для локальной проверки production-сборки:
+
+```bash
 yarn preview
 ```
 
-Docker bilan bot papkasidan hamma servis birga ishga tushadi:
+Vite выведет точный адрес preview-сервера в терминале.
+
+## Запуск через Docker Compose
+
+Общий `docker-compose.yml` находится в соседнем проекте `telegram-bot` и запускает MongoDB, Redis, Telegram-бот и CRM одной командой.
 
 ```bash
 cd ../telegram-bot
@@ -39,16 +144,161 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-CRM: `http://localhost:8080`.
+После запуска CRM будет доступна по адресу:
 
-## FSD tuzilma
+```text
+http://localhost:8080
+```
+
+Для Docker-окружения в `.env` backend-проекта укажите:
+
+```dotenv
+ADMIN_ORIGIN=http://localhost:8080
+```
+
+В контейнере Nginx раздаёт файлы из `dist/`, обрабатывает маршруты SPA и проксирует `/api/` в сервис `bot:3000`.
+
+Полезные команды Docker:
+
+```bash
+# Посмотреть состояние сервисов
+docker compose ps
+
+# Посмотреть журналы CRM и backend
+docker compose logs -f admin bot
+
+# Остановить сервисы
+docker compose down
+```
+
+## Доступные команды
+
+| Команда | Описание |
+| --- | --- |
+| `yarn dev` | Запускает Vite в режиме разработки |
+| `yarn build` | Проверяет TypeScript и создаёт production-сборку |
+| `yarn lint` | Запускает Oxlint |
+| `yarn preview` | Локально запускает собранную версию |
+
+## Структура проекта
 
 ```text
 src/
-├── app/        # provider va global style
-├── pages/      # dashboard sahifasi
-├── widgets/    # statistika va ruxsatlar jadvali
-├── features/   # login, qo'shish, bloklash, o'chirish
-├── entities/   # access grant va session modellari
-└── shared/     # API client va umumiy UI
+├── app/                         # провайдеры приложения и глобальные стили
+├── pages/                       # страницы приложения
+│   └── dashboard/               # страница управления доступами
+├── widgets/                     # крупные самостоятельные блоки интерфейса
+│   ├── access-table/            # таблица, поиск и фильтрация доступов
+│   └── dashboard/               # карточки статистики
+├── features/                    # пользовательские сценарии
+│   ├── access-management/       # добавление, блокировка и удаление доступа
+│   └── auth/                    # форма входа администратора
+├── entities/                    # бизнес-модели и состояние сущностей
+│   ├── access-grant/            # типы доступа и статистики
+│   └── session/                 # состояние сессии и Basic Auth
+├── shared/                      # переиспользуемая инфраструктура
+│   ├── api/                     # общий HTTP-клиент
+│   ├── config/                  # конфигурация локализации
+│   └── ui/                      # общие UI-компоненты
+├── App.tsx                      # переключение между входом и дашбордом
+└── main.tsx                     # точка входа React-приложения
 ```
+
+## Алиасы импортов
+
+| Алиас | Каталог |
+| --- | --- |
+| `@app` | `src/app` |
+| `@pages` | `src/pages` |
+| `@widgets` | `src/widgets` |
+| `@features` | `src/features` |
+| `@entities` | `src/entities` |
+| `@shared` | `src/shared` |
+
+Пример:
+
+```tsx
+import { LoginForm } from '@features/auth/ui/login-form'
+import { DashboardPage } from '@pages/dashboard/ui/dashboard-page'
+```
+
+Алиасы синхронно настроены в `vite.config.ts` и `tsconfig.app.json`.
+
+## Работа с API
+
+Все запросы отправляются с заголовком HTTP Basic Authentication. Логин и пароль хранятся только в состоянии текущей вкладки Zustand и очищаются при выходе или перезагрузке страницы.
+
+| Метод | Маршрут | Назначение |
+| --- | --- | --- |
+| `GET` | `/api/session` | Проверить логин и пароль администратора |
+| `GET` | `/api/access` | Получить список доступов |
+| `POST` | `/api/access` | Добавить связку username и телефона |
+| `PATCH` | `/api/access/:id` | Заблокировать или активировать доступ |
+| `DELETE` | `/api/access/:id` | Удалить доступ |
+| `GET` | `/api/stats` | Получить статистику дашборда |
+
+После успешного добавления, изменения или удаления React Query автоматически обновляет список доступов и статистику. Данные считаются актуальными в течение 15 секунд; автоматический повтор неуспешного запроса выполняется один раз.
+
+## Локализация
+
+Интерфейс поддерживает два языка:
+
+- русский — язык по умолчанию;
+- английский — включается переключателем `RU / EN`.
+
+Выбранный язык сохраняется в `localStorage` браузера под ключом `crm-language`. Все переводы находятся в `src/shared/config/i18n.ts`.
+
+Чтобы добавить новый язык:
+
+1. Добавьте новый объект переводов в `resources`.
+2. Добавьте язык в компонент `LanguageSwitcher`.
+3. Обновите проверку сохранённого языка при инициализации i18next.
+
+## Проверка перед публикацией
+
+Перед созданием Docker-образа или развёртыванием рекомендуется выполнить:
+
+```bash
+yarn lint
+yarn build
+```
+
+Обе команды должны завершиться без ошибок.
+
+## Решение распространённых проблем
+
+### CRM не подключается к серверу
+
+Проверьте, что backend запущен на порту `3000`, а запрос `GET /api/session` доступен. При локальной разработке также проверьте `ADMIN_ORIGIN=http://localhost:5173` в `.env` backend.
+
+### Вход не выполняется
+
+Убедитесь, что введённые данные совпадают с `ADMIN_USERNAME` и `ADMIN_PASSWORD` backend-проекта. После изменения `.env` перезапустите backend.
+
+### После обновления страницы снова открывается форма входа
+
+Это ожидаемое поведение: учётные данные не сохраняются в `localStorage` или cookie. Сессия существует только в памяти текущей вкладки.
+
+### Docker-версия возвращает ошибку API
+
+Проверьте состояние контейнеров и журналы сервисов:
+
+```bash
+cd ../telegram-bot
+docker compose ps
+docker compose logs -f admin bot
+```
+
+Также убедитесь, что сервис backend называется `bot`: именно на `http://bot:3000` направляет запросы конфигурация Nginx.
+
+## Безопасность
+
+- Используйте длинный уникальный `ADMIN_PASSWORD`.
+- Не добавляйте `.env` и `.env.local` в Git.
+- Публикуйте CRM только через HTTPS.
+- Не помещайте секреты в переменные с префиксом `VITE_`.
+- Ограничивайте доступ к административной панели на уровне reverse proxy или сети, если она не должна быть публичной.
+
+## Связанный проект
+
+CRM является клиентской частью Logistic Bot. Backend, Telegram-логика, MongoDB и общий Docker Compose находятся в соседнем каталоге `../telegram-bot`.

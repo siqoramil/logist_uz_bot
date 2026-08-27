@@ -1,15 +1,27 @@
 import { useTranslation } from 'react-i18next'
-import type { DashboardStats } from '@entities/access-grant/model/types'
-import { Icon } from '@shared/ui/icon'
+import type { DashboardStats } from '@entities/access-grant'
+import { Icon, type IconName } from '@shared/ui'
+
+interface StatCardDefinition<TKey extends keyof DashboardStats = keyof DashboardStats> {
+  key: TKey
+  labelKey: `stats.${TKey}`
+  icon: IconName
+  tone: string
+}
 
 const cards = [
   { key: 'total', labelKey: 'stats.total', icon: 'users', tone: 'bg-slate-100 text-ink-700' },
   { key: 'active', labelKey: 'stats.active', icon: 'check', tone: 'bg-emerald-100 text-emerald-700' },
   { key: 'linked', labelKey: 'stats.linked', icon: 'link', tone: 'bg-blue-100 text-blue-700' },
   { key: 'subscribers', labelKey: 'stats.subscribers', icon: 'bot', tone: 'bg-orange-100 text-orange-700' },
-] as const
+] as const satisfies readonly StatCardDefinition[]
 
-export function StatsGrid({ stats, loading }: { stats?: DashboardStats; loading: boolean }) {
+interface StatsGridProps {
+  stats: DashboardStats | undefined
+  loading: boolean
+}
+
+export function StatsGrid({ stats, loading }: StatsGridProps) {
   const { t } = useTranslation()
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

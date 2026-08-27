@@ -1,6 +1,6 @@
-import { LoginForm } from '@features/auth/ui/login-form'
-import { DashboardPage } from '@pages/dashboard/ui/dashboard-page'
-import { useSessionStore } from '@entities/session/model/session-store'
+import { LoginForm } from '@features/auth'
+import { DashboardPage } from '@pages/dashboard'
+import { useSessionStore } from '@entities/session'
 
 function App() {
   const authenticated = useSessionStore((state) => state.authenticated)

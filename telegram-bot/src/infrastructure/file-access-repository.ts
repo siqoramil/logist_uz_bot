@@ -14,6 +14,7 @@ import type { AccessRepository } from "@ports";
 
 interface StoredAccessGrant {
   readonly id: string;
+  readonly fullName?: string | null;
   readonly username: string | null;
   readonly phone: string;
   readonly enabled: boolean;
@@ -47,8 +48,20 @@ const validatePhone = (raw: string): string => {
   return phone;
 };
 
+const validateFullName = (raw: string): string => {
+  const fullName = raw.trim().replace(/\s+/g, " ");
+  if (fullName.length < 2 || fullName.length > 100) {
+    throw new AccessInputError(
+      "invalid-full-name",
+      "Ism-familiya 2–100 ta belgidan iborat bo'lishi kerak",
+    );
+  }
+  return fullName;
+};
+
 const toDomain = (grant: StoredAccessGrant): AccessGrant => ({
   ...grant,
+  fullName: grant.fullName ?? null,
   expiresAt: new Date(grant.expiresAt),
   billingHistory: grant.billingHistory.map((payment) => ({
     ...payment,
@@ -104,8 +117,9 @@ export class FileAccessRepository implements AccessRepository {
     return grants.sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   }
 
-  async add(rawUsername: string | null, rawPhone: string): Promise<AccessGrant> {
+  async add(rawUsername: string | null, rawPhone: string, rawFullName: string): Promise<AccessGrant> {
     return this.synchronized(async () => {
+      const fullName = validateFullName(rawFullName);
       const username = rawUsername === null || rawUsername.trim() === ""
         ? null
         : validateUsername(rawUsername);
@@ -126,6 +140,7 @@ export class FileAccessRepository implements AccessRepository {
         }
         const renewed: AccessGrant = {
           ...existing,
+          fullName,
           enabled: true,
           expiresAt: addAccessMonth(existing.expiresAt > now ? existing.expiresAt : now),
           billingHistory: [
@@ -141,6 +156,7 @@ export class FileAccessRepository implements AccessRepository {
 
       const grant: AccessGrant = {
         id: randomBytes(12).toString("hex"),
+        fullName,
         username,
         phone,
         enabled: true,
@@ -177,6 +193,22 @@ export class FileAccessRepository implements AccessRepository {
       grants[index] = grant;
       await this.write(grants);
       return grant;
+    });
+  }
+
+  async updateFullName(id: string, rawFullName: string): Promise<AccessGrant | null> {
+    return this.synchronized(async () => {
+      const grants = await this.read();
+      const index = grants.findIndex((grant) => grant.id === id);
+      if (index < 0) return null;
+      const updated: AccessGrant = {
+        ...grants[index]!,
+        fullName: validateFullName(rawFullName),
+        updatedAt: new Date(),
+      };
+      grants[index] = updated;
+      await this.write(grants);
+      return updated;
     });
   }
 

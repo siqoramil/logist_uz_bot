@@ -26,6 +26,7 @@ export class NoMessageError extends DomainError {
 }
 
 export type AccessInputErrorCode =
+  | "invalid-full-name"
   | "invalid-username"
   | "invalid-phone"
   | "username-in-use"

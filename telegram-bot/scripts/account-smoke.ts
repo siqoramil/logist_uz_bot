@@ -24,6 +24,7 @@ const fakeState = {
   getLastResult: async () => latestResult,
 } as unknown as RedisBroadcastState;
 const fakeClient = {
+  connected: true,
   async getDialogs(): Promise<FakeDialog[]> {
     return dialogs;
   },

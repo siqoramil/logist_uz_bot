@@ -218,11 +218,12 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
           ? body.username
           : null;
         const phone = body.phone;
-        if (!isNonEmptyString(phone)) {
-          errorJson(res, 400, "missing-fields", "Telefon raqamini to'g'ri kiriting");
+        const fullName = body.fullName;
+        if (!isNonEmptyString(phone) || !isNonEmptyString(fullName)) {
+          errorJson(res, 400, "missing-fields", "Ism-familiya va telefon raqamini to'g'ri kiriting");
           return;
         }
-        const grant = await access.add(username, phone);
+        const grant = await access.add(username, phone, fullName);
         json(res, 201, { grant });
         return;
       }
@@ -230,6 +231,15 @@ export const startAdminServer = (options: AdminServerOptions): (() => Promise<vo
       const match = url.pathname.match(/^\/api\/access\/([a-f\d]{24})$/i);
       if (match && req.method === "PATCH") {
         const body = asObject(await readBody(req));
+        if (typeof body.fullName === "string") {
+          const grant = await access.updateFullName(match[1] ?? "", body.fullName);
+          if (!grant) {
+            errorJson(res, 404, "access-not-found", "Foydalanuvchi topilmadi");
+            return;
+          }
+          json(res, 200, { grant });
+          return;
+        }
         if (typeof body.enabled !== "boolean") {
           errorJson(res, 400, "invalid-enabled", "enabled boolean bo'lishi kerak");
           return;

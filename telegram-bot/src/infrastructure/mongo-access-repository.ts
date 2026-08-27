@@ -15,6 +15,7 @@ interface AccessGrantDoc {
   /** Kept for compatibility with the previous unique Mongo index. */
   type: string;
   value: string;
+  fullName?: string;
   username?: string;
   phone: string;
   enabled: boolean;
@@ -38,6 +39,7 @@ const AccessGrantSchema = new Schema<AccessGrantDoc>(
   {
     type: { type: String, required: true },
     value: { type: String, required: true },
+    fullName: { type: String, required: false },
     username: { type: String, required: false },
     phone: { type: String, required: true },
     enabled: { type: Boolean, default: true, index: true },
@@ -67,6 +69,7 @@ const DataMigrationModel = model<DataMigrationDoc>("DataMigration", new Schema({
 
 const toDomain = (doc: AccessGrantDoc): AccessGrant => ({
   id: doc._id.toString(),
+  fullName: doc.fullName ?? null,
   username: doc.username ?? null,
   phone: doc.phone,
   enabled: doc.enabled,
@@ -98,6 +101,17 @@ const validatePhone = (rawValue: string): string => {
     throw new AccessInputError(
       "invalid-phone",
       "Telefon raqami O'zbekiston formatida bo'lishi kerak: +998 99 123 11 22",
+    );
+  }
+  return value;
+};
+
+const validateFullName = (rawValue: string): string => {
+  const value = rawValue.trim().replace(/\s+/g, " ");
+  if (value.length < 2 || value.length > 100) {
+    throw new AccessInputError(
+      "invalid-full-name",
+      "Ism-familiya 2–100 ta belgidan iborat bo'lishi kerak",
     );
   }
   return value;
@@ -147,6 +161,7 @@ export class MongoAccessRepository implements AccessRepository {
           ...(Types.ObjectId.isValid(grant.id) ? { _id: new Types.ObjectId(grant.id) } : {}),
           type: "pair",
           value: grant.username === null ? `phone:${grant.phone}` : `${grant.username}:${grant.phone}`,
+          ...(grant.fullName === null ? {} : { fullName: grant.fullName }),
           ...(grant.username === null ? {} : { username: grant.username }),
           phone: grant.phone,
           enabled: grant.enabled,
@@ -183,8 +198,9 @@ export class MongoAccessRepository implements AccessRepository {
     return docs.map(toDomain);
   }
 
-  async add(rawUsername: string | null, rawPhone: string): Promise<AccessGrant> {
+  async add(rawUsername: string | null, rawPhone: string, rawFullName: string): Promise<AccessGrant> {
     await this.ensureLegacyFields();
+    const fullName = validateFullName(rawFullName);
     const username = rawUsername === null || rawUsername.trim() === ""
       ? null
       : validateUsername(rawUsername);
@@ -213,6 +229,7 @@ export class MongoAccessRepository implements AccessRepository {
         );
       }
       existing.enabled = true;
+      existing.fullName = fullName;
       const periodStart = existing.expiresAt && existing.expiresAt > now
         ? existing.expiresAt
         : now;
@@ -228,6 +245,7 @@ export class MongoAccessRepository implements AccessRepository {
     const doc = await AccessGrantModel.create({
       type: "pair",
       value: username === null ? `phone:${phone}` : `${username}:${phone}`,
+      fullName,
       ...(username === null ? {} : { username }),
       phone,
       enabled: true,
@@ -254,6 +272,18 @@ export class MongoAccessRepository implements AccessRepository {
     }
     await doc.save();
     return toDomain(doc.toObject());
+  }
+
+  async updateFullName(id: string, rawFullName: string): Promise<AccessGrant | null> {
+    await this.ensureLegacyFields();
+    const _id = objectId(id);
+    if (!_id) return null;
+    const doc = await AccessGrantModel.findByIdAndUpdate(
+      _id,
+      { $set: { fullName: validateFullName(rawFullName) } },
+      { returnDocument: "after" },
+    ).lean<AccessGrantDoc>().exec();
+    return doc ? toDomain(doc) : null;
   }
 
   async expireDue(now: Date): Promise<AccessGrant[]> {

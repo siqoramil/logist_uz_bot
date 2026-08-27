@@ -109,6 +109,8 @@ const failure = (group: string, code: DeliveryErrorCode): BroadcastFailure => ({
 
 export class TelegramAccountBroadcaster {
   private currentJob: AbortController | null = null;
+  private reconnectPromise: Promise<void> | null = null;
+  private connectionGeneration = 0;
 
   constructor(
     private readonly client: TelegramClient,
@@ -163,10 +165,7 @@ export class TelegramAccountBroadcaster {
           let classification: ClassifiedError | null = null;
 
           try {
-            await this.client.sendMessage(group.entity, {
-              message: text,
-              parseMode: undefined,
-            });
+            await this.sendMessage(group, text);
             sent += 1;
             deliveredGroups.push(group.title);
           } catch (error) {
@@ -177,7 +176,7 @@ export class TelegramAccountBroadcaster {
               await sleep((waitSeconds + 1) * 1_000, job.signal);
               if (!job.signal.aborted) {
                 try {
-                  await this.client.sendMessage(group.entity, { message: text, parseMode: undefined });
+                  await this.sendMessage(group, text);
                   sent += 1;
                   deliveredGroups.push(group.title);
                   classification = null;
@@ -222,11 +221,22 @@ export class TelegramAccountBroadcaster {
 
   private async loadGroups(): Promise<GroupTarget[]> {
     const groups: GroupTarget[] = [];
-    const dialogs = await this.client.getDialogs({
+    await this.ensureConnected();
+    const generation = this.connectionGeneration;
+    const getDialogs = () => this.client.getDialogs({
       limit: undefined,
       // teleproto 1.228.5 has an inverted ignoreMigrated filter; filter below.
       ignoreMigrated: false,
     });
+
+    let dialogs;
+    try {
+      dialogs = await getDialogs();
+    } catch (error) {
+      if (!this.isConnectionFailure(error)) throw error;
+      await this.reconnect(generation);
+      dialogs = await getDialogs();
+    }
 
     for (const dialog of dialogs) {
       const entity = dialog.entity;
@@ -238,5 +248,56 @@ export class TelegramAccountBroadcaster {
       });
     }
     return groups;
+  }
+
+  private async sendMessage(group: GroupTarget, text: string): Promise<void> {
+    await this.ensureConnected();
+    await this.client.sendMessage(group.entity, {
+      message: text,
+      parseMode: undefined,
+    });
+  }
+
+  private async ensureConnected(): Promise<void> {
+    if (this.client.connected) return;
+    await this.reconnect(this.connectionGeneration, false);
+  }
+
+  private async reconnect(observedGeneration: number, force = true): Promise<void> {
+    if (this.connectionGeneration > observedGeneration && this.client.connected) return;
+    if (this.reconnectPromise) {
+      await this.reconnectPromise;
+      return;
+    }
+
+    const reconnectPromise = (async () => {
+      this.logger.info("Ishchi Telegram account qayta ulanmoqda...");
+      if (force && this.client.connected) {
+        await this.client.disconnect().catch(() => undefined);
+      }
+      if (!this.client.connected) {
+        await this.client.connect();
+      }
+      if (!this.client.connected || !(await this.client.checkAuthorization())) {
+        throw new Error("telegram-account-not-authorized");
+      }
+      this.connectionGeneration += 1;
+      this.logger.success("Ishchi Telegram account qayta ulandi");
+    })();
+
+    this.reconnectPromise = reconnectPromise;
+    try {
+      await reconnectPromise;
+    } finally {
+      if (this.reconnectPromise === reconnectPromise) this.reconnectPromise = null;
+    }
+  }
+
+  private isConnectionFailure(error: unknown): boolean {
+    if (!this.client.connected) return true;
+    const code = classify(error).code;
+    return code === "network-unavailable" ||
+      code === "request-timeout" ||
+      code === "connection-reset";
   }
 }

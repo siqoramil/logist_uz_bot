@@ -98,21 +98,21 @@ async function main(): Promise<void> {
   check("tanlangan til qayta kirishda saqlanadi", (await subscribers.find(USER))?.language === "ru");
 
   console.log("\n2) Username + telefon orqali dostupni tasdiqlash");
-  const accessGrant = await access.add("@testuser", "+998 90 000 00 01");
+  const accessGrant = await access.add("@testuser", "+998 90 000 00 01", "Test User");
   check("username normallashtirildi", accessGrant.username === "testuser");
   check("telefon normallashtirildi", accessGrant.phone === "998900000001");
   check("oylik tugash vaqti yozildi", accessGrant.expiresAt.getTime() > Date.now());
   check("100 000 so'mlik to'lov yozildi", accessGrant.billingHistory[0]?.amount === ACCESS_MONTH_PRICE_UZS);
   let usernameConflict = false;
   try {
-    await access.add("@testuser", "+998 90 000 00 02");
+    await access.add("@testuser", "+998 90 000 00 02", "Test User");
   } catch (error) {
     usernameConflict = error instanceof AccessInputError && error.code === "username-in-use";
   }
   check("username boshqa telefon bilan aniq xato qaytaradi", usernameConflict);
   let phoneConflict = false;
   try {
-    await access.add("@other_user", "+998 90 000 00 01");
+    await access.add("@other_user", "+998 90 000 00 01", "Other User");
   } catch (error) {
     phoneConflict = error instanceof AccessInputError && error.code === "phone-in-use";
   }

@@ -3,8 +3,8 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock ./
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --frozen-lockfile --ignore-platform
+RUN --mount=type=cache,id=logistic-admin-yarn,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn install --frozen-lockfile
 COPY . .
 RUN yarn build
 

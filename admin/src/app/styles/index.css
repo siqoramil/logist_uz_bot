@@ -38,3 +38,7 @@ button { cursor: pointer; }
     linear-gradient(90deg, rgba(16, 29, 26, 0.035) 1px, transparent 1px);
   background-size: 28px 28px;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter { animation: none; }
+}

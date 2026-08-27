@@ -1,11 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@app/styles/index.css'
-import '@shared/config/i18n'
-import { QueryProvider } from '@app/providers/query-provider'
+import '@shared/config'
+import { QueryProvider } from '@app/providers'
 import App from './App.tsx'
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root')
+if (!rootElement) throw new Error('Root element topilmadi')
+
+createRoot(rootElement).render(
   <StrictMode>
     <QueryProvider>
       <App />
