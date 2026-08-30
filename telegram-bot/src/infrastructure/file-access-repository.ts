@@ -278,30 +278,6 @@ export class FileAccessRepository implements AccessRepository {
     );
   }
 
-  async authorizeByUsername(userId: number, username: string | null): Promise<boolean> {
-    return this.synchronized(async () => {
-      if (!username) return false;
-      const grants = await this.read();
-      const normalized = normalizeUsername(username);
-      const now = new Date();
-      const index = grants.findIndex((grant) =>
-        grant.enabled && grant.expiresAt > now && grant.username === normalized &&
-        (grant.linkedUserId === null || grant.linkedUserId === userId));
-      if (index < 0) return false;
-      const grant = grants[index]!;
-      if (grant.linkedUserId === null) {
-        grants[index] = {
-          ...grant,
-          linkedUserId: userId,
-          linkedUsername: normalized,
-          updatedAt: now,
-        };
-        await this.write(grants);
-      }
-      return true;
-    });
-  }
-
   async authorizeByPhone(
     userId: number,
     username: string | null,
@@ -314,7 +290,6 @@ export class FileAccessRepository implements AccessRepository {
       const index = grants.findIndex((grant) =>
         grant.enabled && grant.expiresAt > new Date() &&
         grant.phone === phone &&
-        (normalized === null || grant.username === null || grant.username === normalized) &&
         (grant.linkedUserId === null || grant.linkedUserId === userId));
       if (index < 0) return false;
       const grant = grants[index]!;

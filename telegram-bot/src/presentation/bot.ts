@@ -13,15 +13,13 @@ import type {
 } from "@use-cases";
 import { detectLanguage, getTexts, type BotTexts, type PaymentDetails } from "./texts";
 
-const INTERVAL_CHOICES = [15, 30, 60, 120, 240, 480] as const;
 const HTML = { parse_mode: "HTML" } as const;
 
 const mainMenu = (subscriber: Subscriber, t: BotTexts): InlineKeyboard =>
   new InlineKeyboard()
     .text(t.buttons.message, "set-message")
-    .text(t.buttons.interval, "set-interval")
-    .row()
     .text(t.buttons.groups, "groups")
+    .row()
     .text(t.buttons.sendNow, "send-now")
     .row()
     .text(
@@ -34,15 +32,6 @@ const mainMenu = (subscriber: Subscriber, t: BotTexts): InlineKeyboard =>
 
 const backMenu = (t: BotTexts): InlineKeyboard =>
   new InlineKeyboard().text(t.buttons.back, "refresh");
-
-const intervalMenu = (t: BotTexts): InlineKeyboard => {
-  const keyboard = new InlineKeyboard();
-  INTERVAL_CHOICES.forEach((minutes, index) => {
-    keyboard.text(`${minutes} ${t.minuteShort}`, `interval:${minutes}`);
-    if (index % 3 === 2) keyboard.row();
-  });
-  return keyboard.row().text(t.buttons.back, "refresh");
-};
 
 const languageMenu = (): InlineKeyboard =>
   new InlineKeyboard()
@@ -99,8 +88,7 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
     const from = ctx.from;
     if (!from) return null;
     const language = await contextLanguage(ctx);
-    const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
-      (await access.authorizeByUsername(from.id, from.username ?? null));
+    const authorized = await access.isAuthorized(from.id, from.username ?? null);
     if (!authorized) {
       await showAccessDenied(ctx, language);
       return null;
@@ -137,8 +125,7 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
 
     if (isIn) {
       const language = await contextLanguage(ctx);
-      const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
-        (await access.authorizeByUsername(from.id, from.username ?? null));
+      const authorized = await access.isAuthorized(from.id, from.username ?? null);
       if (!authorized) {
         await ctx.api.sendMessage(from.id, getTexts(language).accessDenied(payment), HTML).catch(() => undefined);
         await ctx.api.leaveChat(chat.id).catch(() => undefined);
@@ -190,7 +177,7 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
       contact.phone_number,
     );
     if (!authorized) {
-      await ctx.reply(t.accessDetailsMismatch, { reply_markup: contactKeyboard(t) });
+      await showAccessDenied(ctx, language);
       return;
     }
     const subscriber = await manage.register(from.id, from.username ?? null, language);
@@ -211,8 +198,7 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
     const updated = await manage.setLanguage(subscriber.userId, language);
     const t = getTexts(language);
     await ctx.answerCallbackQuery(t.languageChanged);
-    const authorized = (await access.isAuthorized(from.id, from.username ?? null)) ||
-      (await access.authorizeByUsername(from.id, from.username ?? null));
+    const authorized = await access.isAuthorized(from.id, from.username ?? null);
     if (authorized) {
       await showMenu(ctx, updated);
     } else {
@@ -234,24 +220,6 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
     const updated = await manage.setState(subscriber.userId, "awaiting-message");
     const t = getTexts(updated.language);
     await ctx.editMessageText(t.askMessage(updated.message), { ...HTML, reply_markup: backMenu(t) });
-  });
-
-  bot.callbackQuery("set-interval", async (ctx) => {
-    await ctx.answerCallbackQuery();
-    const subscriber = await requireSubscriber(ctx);
-    if (!subscriber) return;
-    const updated = await manage.setState(subscriber.userId, "awaiting-interval");
-    const t = getTexts(updated.language);
-    await ctx.editMessageText(t.askInterval(updated.intervalMinutes), { ...HTML, reply_markup: intervalMenu(t) });
-  });
-
-  bot.callbackQuery(/^interval:(\d+)$/, async (ctx) => {
-    const minutes = Number.parseInt(ctx.match[1] ?? "", 10);
-    const subscriber = await requireSubscriber(ctx);
-    if (!subscriber) return;
-    const updated = await manage.setInterval(subscriber.userId, minutes);
-    await ctx.answerCallbackQuery(getTexts(updated.language).intervalSaved(minutes));
-    await showMenu(ctx, updated);
   });
 
   bot.callbackQuery("groups", async (ctx) => {
@@ -324,18 +292,6 @@ export const registerHandlers = (bot: Bot, deps: BotDependencies): void => {
       } catch (error) {
         if (!(error instanceof GuardError)) throw error;
         await ctx.reply(t.invalidMessage);
-      }
-      return;
-    }
-    if (subscriber.state === "awaiting-interval") {
-      const minutes = Number.parseInt(text.trim(), 10);
-      try {
-        const updated = await manage.setInterval(subscriber.userId, minutes);
-        await ctx.reply(t.intervalSaved(minutes));
-        await showMenu(ctx, updated);
-      } catch (error) {
-        if (!(error instanceof GuardError)) throw error;
-        await ctx.reply(t.invalidInterval);
       }
       return;
     }

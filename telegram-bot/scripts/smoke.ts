@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   await manage.register(USER, "testuser", "uz");
   check("tanlangan til qayta kirishda saqlanadi", (await subscribers.find(USER))?.language === "ru");
 
-  console.log("\n2) Username + telefon orqali dostupni tasdiqlash");
+  console.log("\n2) Telefon kontakti orqali dostupni tasdiqlash");
   const accessGrant = await access.add("@testuser", "+998 90 000 00 01", "Test User");
   check("username normallashtirildi", accessGrant.username === "testuser");
   check("telefon normallashtirildi", accessGrant.phone === "998900000001");
@@ -121,21 +121,17 @@ async function main(): Promise<void> {
     "oy oxiri to'g'ri hisoblanadi",
     addAccessMonth(new Date("2027-01-31T10:30:00.000Z")).toISOString() === "2027-02-28T10:30:00.000Z",
   );
-  check("kontakt yuborilmasdan dostup yo'q", !(await access.authorizeByUsername(USER, "testuser")));
+  check("kontakt yuborilmasdan dostup yo'q", !(await access.isAuthorized(USER, "testuser")));
   check(
     "noto'g'ri telefon rad etildi",
     !(await access.authorizeByPhone(USER, "testuser", "+998 90 000 00 02")),
   );
   check(
-    "noto'g'ri username rad etildi",
-    !(await access.authorizeByPhone(USER, "other_user", "+998 90 000 00 01")),
-  );
-  check(
-    "to'liq mos juftlik tasdiqlandi",
-    await access.authorizeByPhone(USER, "testuser", "+998 90 000 00 01"),
+    "username mos bo'lmasa ham telefon tasdiqlandi",
+    await access.authorizeByPhone(USER, "other_user", "+998 90 000 00 01"),
   );
   check("tasdiqdan keyin dostup bor", await access.isAuthorized(USER, "testuser"));
-  check("username o'zgarsa dostup yo'q", !(await access.isAuthorized(USER, "changed_user")));
+  check("username o'zgarsa ham dostup saqlanadi", await access.isAuthorized(USER, "changed_user"));
 
   console.log("\n3) Guruh qo'shish / chiqarish");
   await trackChat.added(-100_900_000_001, USER, "Yuk Toshkent");
@@ -156,7 +152,8 @@ async function main(): Promise<void> {
   check("holat idle ga qaytdi", withMessage?.state === "idle");
 
   await manage.setInterval(USER, 30);
-  check("interval 30 bo'ldi", (await subscribers.find(USER))?.intervalMinutes === 30);
+  await manage.register(USER, "testuser", "uz");
+  check("qayta kirishda interval 60 ga qaytadi", (await subscribers.find(USER))?.intervalMinutes === 60);
 
   for (const bad of [0, 3, 5000, Number.NaN]) {
     let threw = false;
@@ -183,8 +180,8 @@ async function main(): Promise<void> {
   check("birinchi yuborish vaqti yozildi", started.lastRunAt !== null);
   check("hozircha due emas", (await scopedSubscribers.findDue(new Date())).length === 0);
 
-  const future = new Date(startedAt.getTime() + 31 * 60_000);
-  check("31 daqiqadan keyin due", (await scopedSubscribers.findDue(future)).length === 1);
+  const future = new Date(startedAt.getTime() + 61 * 60_000);
+  check("61 daqiqadan keyin due", (await scopedSubscribers.findDue(future)).length === 1);
 
   console.log("\n6) Tarqatish va o'lik guruhni tozalash");
   const result = await broadcast.execute((await subscribers.find(USER))!);

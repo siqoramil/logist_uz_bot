@@ -61,7 +61,10 @@ export class MongoSubscriberRepository implements SubscriberRepository {
   ): Promise<Subscriber> {
     const doc = await SubscriberModel.findOneAndUpdate(
       { userId },
-      { $set: { username }, $setOnInsert: { userId, language: preferredLanguage } },
+      {
+        $set: { username, intervalMinutes: DEFAULT_BROADCAST_INTERVAL_MINUTES },
+        $setOnInsert: { userId, language: preferredLanguage },
+      },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
     )
       .lean<SubscriberDoc>()

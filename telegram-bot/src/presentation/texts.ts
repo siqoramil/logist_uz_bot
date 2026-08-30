@@ -19,8 +19,7 @@ const preview = (text: string, max = 120): string => {
 };
 
 export interface PaymentDetails {
-  readonly card: string;
-  readonly cardHolder: string | null;
+  readonly monthlyPriceUzs: number;
   readonly adminContact: string;
 }
 
@@ -134,18 +133,18 @@ const uz: BotTexts = {
     "Bu bot tanlangan guruhlarga xabaringizni belgilangan intervalda avtomatik yuboradi.", "",
     "<b>Qanday ishlaydi:</b>",
     "1️⃣ Botni guruhga qo‘shing va xabar yuborish huquqini bering",
-    "2️⃣ 📝 tugmasi orqali xabar yozing", "3️⃣ ⏱ orqali intervalni tanlang",
-    "4️⃣ ▶️ <b>Boshlash</b> tugmasini bosing",
+    "2️⃣ 📝 tugmasi orqali xabar yozing",
+    "3️⃣ ▶️ <b>Boshlash</b> tugmasini bosing — bot har 60 daqiqada yuboradi",
   ].join("\n"),
   help: [
     "<b>Buyruqlar</b>", "", "/start — botni ishga tushirish", "/menu — bosh menyu",
     "/status — hozirgi sozlamalar", "/language — tilni tanlash", "/help — yordam", "",
-    `Interval ${MIN_BROADCAST_INTERVAL_MINUTES}–${MAX_BROADCAST_INTERVAL_MINUTES} daqiqa bo‘lishi kerak.`,
+    "Xabarlar har 60 daqiqada yuboriladi.",
   ].join("\n"),
   languageTitle: "🌐 <b>Tilni tanlang</b>",
   languageChanged: "✅ Til o‘zgartirildi.",
   contactNotYours: "⚠️ Faqat o‘zingizning Telegram kontaktingizni yuboring.",
-  accessDetailsMismatch: "⛔️ Bu telefon raqamiga admin tomonidan ruxsat berilmagan yoki ma’lumotlar mos kelmadi.",
+  accessDetailsMismatch: "⛔️ Bu telefon raqamiga admin tomonidan ruxsat berilmagan.",
   accessGranted: "✅ Ruxsat tasdiqlandi. Botdan foydalanishingiz mumkin.",
   accessRevoked: "⛔️ Botdan foydalanish ruxsatingiz faol emas.",
   noGroups: "⚠️ Avval botni kamida bitta guruhga qo‘shing.",
@@ -158,15 +157,12 @@ const uz: BotTexts = {
   sending: "📤 Yuborilmoqda...",
   serverError: "⚠️ Serverda vaqtinchalik xato yuz berdi. Birozdan keyin qayta urinib ko‘ring.",
   minuteShort: "daq",
-  accessDenied: (payment) => {
-    const holder = payment.cardHolder ? `\nKarta egasi: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
-    return [
-      "🔒 <b>Botdan foydalanish uchun ruxsat kerak</b>", "", "To‘lovni quyidagi kartaga yuboring:",
-      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `Chekni ${escapeHtml(payment.adminContact)} ga yuboring. Admin telefon raqamingizga ruxsat beradi; username majburiy emas.`, "",
-      "So‘ng pastdagi tugma orqali o‘z kontaktingizni yuboring. Tilni /language orqali almashtirish mumkin.",
-    ].join("\n");
-  },
+  accessDenied: (payment) => [
+    "🔒 <b>Bu telefon raqamiga dostup berilmagan</b>", "",
+    `Bir oylik dostup narxi: <b>${payment.monthlyPriceUzs.toLocaleString("uz-UZ")} so‘m</b>.`,
+    `Dostup olish uchun ${escapeHtml(payment.adminContact)} bilan bog‘laning.`, "",
+    "Admin telefon raqamingizga dostup bergach, pastdagi tugma orqali o‘z kontaktingizni yuboring.",
+  ].join("\n"),
   statusCard: (subscriber, chatCount) => {
     const state = subscriber.active ? "🟢 Ishlayapti" : "⚪️ To‘xtatilgan";
     const message = subscriber.message === null ? "<i>hali belgilanmagan</i>" : escapeHtml(preview(subscriber.message));
@@ -217,18 +213,18 @@ const ru: BotTexts = {
     "Бот автоматически отправляет ваше сообщение в выбранные группы с заданным интервалом.", "",
     "<b>Как это работает:</b>",
     "1️⃣ Добавьте бота в группу и разрешите отправку сообщений",
-    "2️⃣ Введите сообщение через кнопку 📝", "3️⃣ Выберите интервал через ⏱",
-    "4️⃣ Нажмите ▶️ <b>Запустить</b>",
+    "2️⃣ Введите сообщение через кнопку 📝",
+    "3️⃣ Нажмите ▶️ <b>Запустить</b> — бот будет отправлять его каждые 60 минут",
   ].join("\n"),
   help: [
     "<b>Команды</b>", "", "/start — запустить бота", "/menu — главное меню",
     "/status — текущие настройки", "/language — выбрать язык", "/help — помощь", "",
-    `Интервал должен быть от ${MIN_BROADCAST_INTERVAL_MINUTES} до ${MAX_BROADCAST_INTERVAL_MINUTES} минут.`,
+    "Сообщения отправляются каждые 60 минут.",
   ].join("\n"),
   languageTitle: "🌐 <b>Выберите язык</b>",
   languageChanged: "✅ Язык изменён.",
   contactNotYours: "⚠️ Отправьте только свой контакт Telegram.",
-  accessDetailsMismatch: "⛔️ Администратор не разрешил этот номер или данные не совпадают.",
+  accessDetailsMismatch: "⛔️ Администратор не разрешил этот номер телефона.",
   accessGranted: "✅ Доступ подтверждён. Ботом можно пользоваться.",
   accessRevoked: "⛔️ Ваш доступ к боту неактивен.",
   noGroups: "⚠️ Сначала добавьте бота хотя бы в одну группу.",
@@ -241,15 +237,12 @@ const ru: BotTexts = {
   sending: "📤 Отправка...",
   serverError: "⚠️ Временная ошибка сервера. Попробуйте ещё раз немного позже.",
   minuteShort: "мин",
-  accessDenied: (payment) => {
-    const holder = payment.cardHolder ? `\nВладелец карты: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
-    return [
-      "🔒 <b>Для использования бота нужен доступ</b>", "", "Отправьте оплату на карту:",
-      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `После оплаты отправьте чек ${escapeHtml(payment.adminContact)}. Администратор разрешит ваш номер; username необязателен.`, "",
-      "Затем отправьте свой контакт кнопкой ниже. Язык можно изменить командой /language.",
-    ].join("\n");
-  },
+  accessDenied: (payment) => [
+    "🔒 <b>Для этого номера телефона доступ не выдан</b>", "",
+    `Стоимость доступа на один месяц: <b>${payment.monthlyPriceUzs.toLocaleString("ru-RU")} сум</b>.`,
+    `Чтобы получить доступ, свяжитесь с ${escapeHtml(payment.adminContact)}.`, "",
+    "После выдачи доступа отправьте свой контакт кнопкой ниже.",
+  ].join("\n"),
   statusCard: (subscriber, chatCount) => {
     const state = subscriber.active ? "🟢 Работает" : "⚪️ Остановлено";
     const message = subscriber.message === null ? "<i>ещё не задано</i>" : escapeHtml(preview(subscriber.message));
@@ -300,18 +293,18 @@ const en: BotTexts = {
     "This bot automatically sends your message to selected groups at a chosen interval.", "",
     "<b>How it works:</b>",
     "1️⃣ Add the bot to a group and allow it to send messages",
-    "2️⃣ Enter your message with the 📝 button", "3️⃣ Choose an interval with ⏱",
-    "4️⃣ Press ▶️ <b>Start</b>",
+    "2️⃣ Enter your message with the 📝 button",
+    "3️⃣ Press ▶️ <b>Start</b> — the bot will send it every 60 minutes",
   ].join("\n"),
   help: [
     "<b>Commands</b>", "", "/start — start the bot", "/menu — main menu",
     "/status — current settings", "/language — choose language", "/help — help", "",
-    `The interval must be between ${MIN_BROADCAST_INTERVAL_MINUTES} and ${MAX_BROADCAST_INTERVAL_MINUTES} minutes.`,
+    "Messages are sent every 60 minutes.",
   ].join("\n"),
   languageTitle: "🌐 <b>Choose a language</b>",
   languageChanged: "✅ Language changed.",
   contactNotYours: "⚠️ Please share only your own Telegram contact.",
-  accessDetailsMismatch: "⛔️ The admin has not allowed this phone number, or the details do not match.",
+  accessDetailsMismatch: "⛔️ The admin has not allowed this phone number.",
   accessGranted: "✅ Access confirmed. You can now use the bot.",
   accessRevoked: "⛔️ Your access to the bot is not active.",
   noGroups: "⚠️ First add the bot to at least one group.",
@@ -324,15 +317,12 @@ const en: BotTexts = {
   sending: "📤 Sending...",
   serverError: "⚠️ A temporary server error occurred. Please try again a little later.",
   minuteShort: "min",
-  accessDenied: (payment) => {
-    const holder = payment.cardHolder ? `\nCard holder: <b>${escapeHtml(payment.cardHolder)}</b>` : "";
-    return [
-      "🔒 <b>Access is required to use this bot</b>", "", "Send payment to this card:",
-      `<code>${escapeHtml(payment.card)}</code>${holder}`, "",
-      `After payment, send the receipt to ${escapeHtml(payment.adminContact)}. The administrator will approve your phone number; a username is optional.`, "",
-      "Then share your contact using the button below. Use /language to change the language.",
-    ].join("\n");
-  },
+  accessDenied: (payment) => [
+    "🔒 <b>Access has not been granted for this phone number</b>", "",
+    `One month of access costs <b>${payment.monthlyPriceUzs.toLocaleString("en-US")} UZS</b>.`,
+    `Contact ${escapeHtml(payment.adminContact)} to get access.`, "",
+    "After the admin grants access, share your contact using the button below.",
+  ].join("\n"),
   statusCard: (subscriber, chatCount) => {
     const state = subscriber.active ? "🟢 Running" : "⚪️ Stopped";
     const message = subscriber.message === null ? "<i>not set yet</i>" : escapeHtml(preview(subscriber.message));

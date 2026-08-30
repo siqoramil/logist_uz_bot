@@ -1,78 +1,46 @@
-# Logistic Multi-Account Sender
+# Logistic Telegram Bot
 
-Har bir foydalanuvchi botga o‘z job accountidan yozadi. Bot xabarni aynan shu
-job account a’zo bo‘lgan barcha guruhlarga yuboradi va har 60 daqiqada takrorlaydi.
-Shaxsiy Telegram account bu oqimda qatnashmaydi.
+Ko‘p foydalanuvchili logistika bot. Har bir foydalanuvchi o‘z telefon raqami
+orqali dostupni tasdiqlaydi, botni o‘z guruhlariga qo‘shadi va o‘z xabarini
+sozlaydi. Foydalanuvchilarning xabari, guruhlari va yuborish holati bir-biridan
+alohida saqlanadi.
 
-## Ishlash tartibi
+Bot xabarni Telegram Bot API orqali, botning o‘z nomidan yuboradi. Shaxsiy yoki
+job account, Telegram StringSession, `api_id` va `api_hash` kerak emas.
 
-1. Job account boshqaruvchi botga matn yuboradi.
-2. Bot `ctx.from.id` orqali aynan shu job accountning Telegram sessionini tanlaydi.
-3. Job account o‘zi a’zo bo‘lgan guruhlarni Telegram API orqali oladi.
-4. Xabar darhol yuboriladi va keyingi yuborish 60 daqiqaga rejalashtiriladi.
-5. Bot progress va yakuniy xatolar hisobotini UZ/RU/EN tilida ko‘rsatadi.
+## Foydalanuvchi oqimi
 
-Har job accountning tarqatishi, locki, sozlamasi va hisoboti alohida. Turli job
-accountlar parallel ishlashi mumkin. `/cancel` faqat buyruq yuborgan job
-accountning joriy va rejalashtirilgan tarqatishini to‘xtatadi.
+1. Admin panelda mijozning ism-familiyasi va telefon raqamiga bir oylik dostup beradi.
+   Telegram username ixtiyoriy va tasdiqlashda ishlatilmaydi.
+2. Foydalanuvchi botda `/start` bosadi va bot so‘ragan tugma bilan o‘z Telegram
+   kontaktini yuboradi.
+3. Telefon raqami aktiv dostup bilan mos kelsa, foydalanuvchi bot menyusiga kiradi.
+4. Foydalanuvchi botni kerakli guruhlarga qo‘shib, unga xabar yuborish huquqini beradi.
+5. Foydalanuvchi xabarini yozadi va tarqatishni boshlaydi. Bot xabarni darhol,
+   keyin har 60 daqiqada faqat shu foydalanuvchiga tegishli guruhlarga yuboradi.
+
+Dostup bo‘lmasa bot bir oylik narx `100 000 so‘m` ekanini ko‘rsatadi va
+`@siqoramil` bilan bog‘lanishni so‘raydi.
 
 ## Sozlash
 
-`telegram-bot/.env` ichiga quyidagilarni qo‘shing:
+`.env.example` dan `.env` yarating va quyidagilarni kiriting:
 
 ```dotenv
 BOT_TOKEN=BotFather_token
-TELEGRAM_API_ID=my_telegram_org_api_id
-TELEGRAM_API_HASH=my_telegram_org_api_hash
-TELEGRAM_ACCOUNT_SESSIONS={"123456789":"first_private_string_session","987654321":"second_private_string_session"}
-BROADCAST_INTERVAL_MINUTES=60
+MONGODB_URI=mongodb://app_user:strong_password@mongo-host:27017/logistic_bot?authSource=logistic_bot
 
-ACCOUNT_SEND_CONCURRENCY=10
-ACCOUNT_MAX_FLOOD_WAIT_SECONDS=300
 ADMIN_USERNAME=admin@example.com
 ADMIN_PASSWORD=replace_with_a_strong_initial_password
 ADMIN_PORT=3000
-MONGODB_URI=mongodb://app_user:strong_password@mongo-host:27017/logistic_bot?authSource=logistic_bot
-REDIS_PASSWORD=replace_with_strong_password
-REDIS_URL=redis://:replace_with_strong_password@redis-host:6379
-REDIS_BROADCAST_LOCK_TTL_MS=60000
-```
-
-Lokal MongoDB va Redis'ni ishga tushirish:
-
-```bash
-yarn infra:up
-```
-
-Productionda `MONGODB_URI` va `REDIS_URL` ni boshqariladigan, autentifikatsiyali servis URL'lariga almashtiring. MongoDB user/access/analytics va til sozlamalarini saqlaydi. Redis broadcast lock va oxirgi hisobotni saqlaydi.
-
-`TELEGRAM_API_ID` va `TELEGRAM_API_HASH` [my.telegram.org/apps](https://my.telegram.org/apps) orqali olinadi.
-
-Har bir job account uchun session yaratish:
-
-```bash
-yarn session
-```
-
-Telefon, Telegram kodi va kerak bo‘lsa 2FA parol kiritiladi. Skript job
-accountning Telegram IDsi bilan JSON entry chiqaradi. Barcha entrylarni bitta
-`TELEGRAM_ACCOUNT_SESSIONS` JSON objectiga birlashtiring. JSON keyidagi ID
-session ichidagi account IDsi bilan mos kelmasa bot sessionni ishlatmaydi.
-
-Session accountga to‘liq kirish huquqini beradi: uni parol kabi maxfiy saqlang,
-Git’ga commit qilmang va loglarga chiqarmang.
-
-Eski bitta-account konfiguratsiyasi `CONTROLLER_USER_ID` va session aynan bitta
-job accountga tegishli bo‘lsa backward-compatible:
-
-```dotenv
-CONTROLLER_USER_ID=123456789
-TELEGRAM_ACCOUNT_SESSION=private_string_session
+ADMIN_ORIGIN=https://admin.example.com
+ADMIN_CONTACT=@siqoramil
 ```
 
 ## Ishga tushirish
 
 ```bash
+yarn install
 yarn dev
 ```
 
@@ -83,31 +51,29 @@ yarn build
 yarn start
 ```
 
-Eski Bot API orqali guruhlarni kuzatadigan rejim vaqtincha saqlangan va kerak
-bo‘lsa `yarn dev:legacy` bilan ishga tushadi.
+`yarn start` va Docker image `dist/index.js` Bot API multi-user rejimini ishga
+tushiradi.
 
 ## Bot buyruqlari
 
-- `/start` — holat va qisqa ko‘rsatma
-- `/groups` — ishchi accountdagi guruhlar soni
-- `/cancel` — shu job accountning joriy va rejalashtirilgan tarqatishini to‘xtatish
+- `/start` — dostupni tekshirish va botni ishga tushirish
+- `/menu` — bosh menyu
+- `/status` — foydalanuvchining joriy holati
+- `/language` — tilni tanlash
 - `/help` — yordam
 
-Admin panelda ruxsat berilgan va `TELEGRAM_ACCOUNT_SESSIONS` ichida sessioni
-sozlangan job accountlargina botni ishlata oladi. Hozircha faqat matnli xabar
-qo‘llab-quvvatlanadi.
-
-## Telegram limitlari
-
-Har job account o‘z guruhlariga `ACCOUNT_SEND_CONCURRENCY` bo‘yicha parallel
-yuboradi. Telegram `FLOOD_WAIT` qaytarsa, faqat o‘sha account ruxsat etilgan
-vaqtgacha kutadi; bir job accountdagi lock yoki hisobot boshqasiga ta’sir qilmaydi.
-
-Telegram API’dan flooding yoki spam uchun foydalanish accountning butunlay bloklanishiga olib kelishi mumkin. Faqat xabar olishga rozilik bergan ishchi guruhlardan foydalaning.
+Bot guruhga qo‘shilganda uni qo‘shgan foydalanuvchining aktiv dostupi tekshiriladi.
+Dostup bo‘lmasa bot guruhni tark etadi. Dostup muddati tugasa tarqatish avtomatik
+to‘xtatiladi.
 
 ## Tekshirish
 
 ```bash
 yarn build
-yarn smoke:account
+```
+
+MongoDB ishlayotgan muhitda to‘liq persistence/scheduler smoke testi:
+
+```bash
+yarn smoke
 ```

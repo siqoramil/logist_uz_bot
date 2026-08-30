@@ -87,8 +87,7 @@ export const registerAccountController = (
     const from = ctx.from;
     if (!from) return false;
     if (controllerUserId !== null && from.id === controllerUserId) return true;
-    if (await access.isAuthorized(from.id, from.username ?? null)) return true;
-    return access.authorizeByUsername(from.id, from.username ?? null);
+    return access.isAuthorized(from.id, from.username ?? null);
   };
 
   const showDenied = async (ctx: Context, answerCallback = true): Promise<void> => {

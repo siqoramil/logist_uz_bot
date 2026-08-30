@@ -1,4 +1,5 @@
 import { Bot, GrammyError } from "grammy";
+import { ACCESS_MONTH_PRICE_UZS } from "@constants";
 import { DomainError } from "@domain";
 import {
   ConsoleLogger,
@@ -56,8 +57,7 @@ async function bootstrap(): Promise<void> {
     trackChat,
     logger,
     payment: {
-      card: config.paymentCard,
-      cardHolder: config.paymentCardHolder,
+      monthlyPriceUzs: ACCESS_MONTH_PRICE_UZS,
       adminContact: config.adminContact,
     },
   });

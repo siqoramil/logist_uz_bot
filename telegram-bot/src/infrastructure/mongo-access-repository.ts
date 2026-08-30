@@ -363,27 +363,6 @@ export class MongoAccessRepository implements AccessRepository {
     })) !== null;
   }
 
-  async authorizeByUsername(
-    userId: number,
-    username: string | null,
-  ): Promise<boolean> {
-    await this.ensureLegacyFields();
-    if (!username) return false;
-    const linkedUsername = normalizeUsername(username);
-    const grant = await AccessGrantModel.findOneAndUpdate(
-      {
-        type: "pair",
-        enabled: true,
-        expiresAt: { $gt: new Date() },
-        username: linkedUsername,
-        $or: [{ linkedUserId: null }, { linkedUserId: userId }],
-      },
-      { $set: { linkedUserId: userId, linkedUsername } },
-      { returnDocument: "after" },
-    ).exec();
-    return grant !== null;
-  }
-
   async authorizeByPhone(
     userId: number,
     username: string | null,
@@ -393,21 +372,13 @@ export class MongoAccessRepository implements AccessRepository {
     const phone = normalizePhone(rawPhone);
     if (!/^\d{7,15}$/.test(phone)) return false;
     const linkedUsername = username ? normalizeUsername(username) : null;
-    const identityConditions: Record<string, unknown>[] = [
-      { $or: [{ linkedUserId: null }, { linkedUserId: userId }] },
-    ];
-    if (linkedUsername !== null) {
-      identityConditions.push({
-        $or: [{ username: linkedUsername }, { username: { $exists: false } }, { username: null }],
-      });
-    }
     const doc = await AccessGrantModel.findOneAndUpdate(
       {
         type: "pair",
         enabled: true,
         expiresAt: { $gt: new Date() },
         phone,
-        $and: identityConditions,
+        $or: [{ linkedUserId: null }, { linkedUserId: userId }],
       },
       { $set: { linkedUserId: userId, linkedUsername } },
       { returnDocument: "after" },

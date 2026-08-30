@@ -40,4 +40,4 @@ COPY --chown=node:node package.json ./
 USER node
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/account-main.js"]
+CMD ["node", "dist/index.js"]

@@ -14,8 +14,6 @@ export interface AppConfig {
   readonly adminPassword: string;
   readonly adminPort: number;
   readonly adminOrigin: string | null;
-  readonly paymentCard: string;
-  readonly paymentCardHolder: string | null;
   readonly adminContact: string;
 }
 
@@ -64,7 +62,5 @@ export const loadConfig = (): AppConfig => ({
   adminPassword: requireMinLengthEnv("ADMIN_PASSWORD", 8),
   adminPort: optionalIntEnv("ADMIN_PORT", 3000, 1, 65_535),
   adminOrigin: optionalEnv("ADMIN_ORIGIN") ?? null,
-  paymentCard: requireEnv("PAYMENT_CARD"),
-  paymentCardHolder: optionalEnv("PAYMENT_CARD_HOLDER") ?? null,
-  adminContact: requireEnv("ADMIN_CONTACT"),
+  adminContact: optionalEnv("ADMIN_CONTACT") ?? "@siqoramil",
 });

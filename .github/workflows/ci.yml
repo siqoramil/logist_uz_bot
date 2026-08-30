@@ -47,8 +47,7 @@ jobs:
       - run: corepack enable
       - run: yarn install --frozen-lockfile
       - run: yarn build
-      - run: yarn smoke:account
-      - run: yarn smoke:multi-account
+      - run: yarn smoke:phone
 
   docker:
     name: Docker images
